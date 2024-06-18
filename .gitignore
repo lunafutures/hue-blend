@@ -1,4 +1,6 @@
 .vscode/settings.json
+private/
+DO_NOT_USE/
 
 # Logs
 logs
@@ -130,3 +132,5 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+.venv/
