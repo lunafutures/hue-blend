@@ -49,10 +49,13 @@ impl ScheduleInfo {
 	}
 
 	pub fn from_env(env_path_var: &str) -> anyhow::Result<ScheduleInfo> {
-		let schedule_path = env::var(env_path_var).context(format!("Unable to load env var: {env_path_var}"))?;
-		let schedule_file = File::open(&schedule_path).context(format!("Unable to open file at {}", &schedule_path))?;
+		let schedule_path = env::var(env_path_var)
+			.context(format!("Unable to load env var: {env_path_var}"))?;
+		let schedule_file = File::open(&schedule_path)
+			.context(format!("Unable to open file at {}", &schedule_path))?;
 		let reader = BufReader::new(schedule_file);
-		let schedule_config: ScheduleConfig = serde_yaml::from_reader(reader).context("Unable to parse schedule yaml file.")?;
+		let schedule_config: ScheduleConfig = serde_yaml::from_reader(reader)
+			.context("Unable to parse schedule yaml file.")?;
 		let tz = match schedule_config.location.timezone.parse::<Tz>() {
 			Ok(tz) => Ok(tz),
 			Err(e) => Err(anyhow::Error::msg(format!("{e}"))),
