@@ -1,5 +1,6 @@
 use std::{env, fs::File, io::BufReader};
 
+use anyhow::Context;
 use chrono::{DateTime, NaiveDate, NaiveTime, TimeZone, Utc};
 use chrono_tz::Tz;
 use serde::Deserialize;
@@ -48,11 +49,10 @@ impl ScheduleInfo {
 	}
 
 	pub fn from_env(env_path_var: &str) -> anyhow::Result<ScheduleInfo> {
-		let reader = 
-			BufReader::new(
-				File::open(
-					env::var(env_path_var)?)?);
-		let schedule_config: ScheduleConfig = serde_yaml::from_reader(reader)?;
+		let schedule_path = env::var(env_path_var).context(format!("Unable to load env var: {env_path_var}"))?;
+		let schedule_file = File::open(&schedule_path).context(format!("Unable to open file at {}", &schedule_path))?;
+		let reader = BufReader::new(schedule_file);
+		let schedule_config: ScheduleConfig = serde_yaml::from_reader(reader).context("Unable to parse schedule yaml file.")?;
 		let tz = match schedule_config.location.timezone.parse::<Tz>() {
 			Ok(tz) => Ok(tz),
 			Err(e) => Err(anyhow::Error::msg(format!("{e}"))),

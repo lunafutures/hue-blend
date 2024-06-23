@@ -40,7 +40,10 @@ fn rocket() -> _ {
 }
 
 fn main2() {
-    dotenvy::dotenv().unwrap();
+    match dotenvy::dotenv() {
+        Err(e) => println!("WARNING! .env NOT LOADED: {}", e),
+        Ok(_) => println!("Successfully loaded .env"),
+    };
     let schedule = ScheduleInfo::new().unwrap();
     println!("{}", schedule.get_sunset_time().unwrap());
 }
