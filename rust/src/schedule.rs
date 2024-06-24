@@ -166,7 +166,28 @@ impl ScheduleInfo {
 	}
 
 	pub fn get_surrounding_schedule_items(&self) -> anyhow::Result<(&ProcessedScheduleItem, &ProcessedScheduleItem)> {
-		todo!();
+		let now = tz_now(&self.tz).unwrap();
+		let todays_schedule = self.todays_schedule.as_ref().unwrap();
+		for i in 0..(todays_schedule.len() - 1) {
+			let before = todays_schedule.get(i).expect("Before too much");
+			let after = todays_schedule.get(i + 1).expect("After too much");
+
+			if before.time <= now && now < after.time {
+				return Ok((before, after))
+			}
+		}
+
+		let last_time = todays_schedule.last().unwrap().time;
+		if last_time < now {
+			return Err(anyhow::anyhow!("now ({now}) is later than last_time ({last_time})."))
+		}
+
+		let first_time = todays_schedule.first().unwrap().time;
+		if now < first_time {
+			return Err(anyhow::anyhow!("now ({now}) is later than first_time ({first_time})."))
+		}
+
+		Err(anyhow::anyhow!("now ({now}) has reached an unknown error."))
 	}
 }
 
@@ -196,6 +217,11 @@ pub fn time_to_today_tz<T: TimeZone>(tz: &T, hour: u8, minute: u8) -> anyhow::Re
 	let now = chrono::Local::now();
 	let today = now.date_naive();
 	time_to_datetime_tz(tz, hour, minute, today)
+}
+
+fn tz_now<T: TimeZone>(tz: &T) -> Option<DateTime<T>> {
+	let now = chrono::Local::now().naive_local();
+	tz.from_local_datetime(&now).earliest()
 }
 
 fn time_to_datetime_tz<T: TimeZone>(tz: &T, hour: u8, minute: u8, date: NaiveDate) -> anyhow::Result<DateTime<T>> {

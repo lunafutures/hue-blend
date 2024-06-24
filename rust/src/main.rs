@@ -46,5 +46,6 @@ fn main2() {
     };
     let mut schedule = ScheduleInfo::new().unwrap();
     schedule.set_today();
-    println!("{:#?}", schedule);
+    let (a, b) = schedule.get_surrounding_schedule_items().unwrap();
+    println!("{a:?} - {b:?}");
 }
