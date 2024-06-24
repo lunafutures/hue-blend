@@ -44,7 +44,7 @@ fn main2() {
         Err(e) => println!("WARNING! .env NOT LOADED: {}", e),
         Ok(_) => println!("Successfully loaded .env"),
     };
-    let schedule = ScheduleInfo::new().unwrap();
-    let schedule_proc = ScheduleInfo::<ProcessedScheduleItem>::from(schedule);
-    println!("{:#?}", schedule_proc);
+    let mut schedule = ScheduleInfo::new().unwrap();
+    schedule.set_today();
+    println!("{:#?}", schedule);
 }

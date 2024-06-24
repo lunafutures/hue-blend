@@ -82,45 +82,50 @@ pub struct RawScheduleItem {
 	change: ChangeItem,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ProcessedScheduleItem {
 	time: DateTime<Tz>,
 	change: ChangeItem,
 }
 
 #[derive(Debug, Deserialize)]
-struct ScheduleConfig<ItemT> {
+struct ScheduleConfig {
 	location: LocationConfig,
-	schedule: Vec<ItemT>,
+	schedule: Vec<RawScheduleItem>,
 }
 
 #[derive(Debug)]
-pub struct ScheduleInfo<ItemT> {
+pub struct ScheduleInfo {
     tz: Tz,
-	config: ScheduleConfig<ItemT>,
+	config: ScheduleConfig,
+	todays_schedule: Option<Vec<ProcessedScheduleItem>>,
 }
 
-impl ScheduleInfo<RawScheduleItem> {
+impl ScheduleInfo {
 	pub fn new() -> anyhow::Result<Self> {
 		Self::from_env("SCHEDULE_YAML_PATH")
 	}
 
 	pub fn from_env(env_path_var: &str) -> anyhow::Result<Self> {
 		let schedule_path = env::var(env_path_var)
-			.context(format!("Unable to load env var: {env_path_var}"))?;
+			.context(format!("Unable to find env var: {env_path_var}"))?;
 		let schedule_file = File::open(&schedule_path)
 			.context(format!("Unable to open file at {}", &schedule_path))?;
 		let reader = BufReader::new(schedule_file);
-		let schedule_config: ScheduleConfig<RawScheduleItem> = serde_yaml::from_reader(reader)
+		let schedule_config: ScheduleConfig = serde_yaml::from_reader(reader)
 			.context("Unable to parse schedule yaml file.")?;
 		let tz = match schedule_config.location.timezone.parse::<Tz>() {
 			Ok(tz) => Ok(tz),
 			Err(e) => Err(anyhow::Error::msg(format!("{e}"))),
 		}?;
+		if schedule_config.schedule.len() == 0 {
+			return Err(anyhow::Error::msg("Schedule must have at least 1 item in it."));
+		}
 		
 		Ok(ScheduleInfo {
 			tz,
 			config: schedule_config,
+			todays_schedule: None,
 		})
 	}
 
@@ -130,27 +135,43 @@ impl ScheduleInfo<RawScheduleItem> {
 			Err(e) => Err(anyhow::Error::msg(format!("{e}"))),
 		}
 	}
-}
 
-impl ScheduleInfo<ProcessedScheduleItem> {
-	pub fn from(raw: ScheduleInfo<RawScheduleItem>) -> Self {
-		let sunset_time = raw.get_sunset_time().unwrap(); // XXX unwrap
-		let config: ScheduleConfig<ProcessedScheduleItem> = ScheduleConfig {
-			location: raw.config.location,
-			schedule: raw.config.schedule
+	pub fn set_today(&mut self) {
+		let sunset_time = self.get_sunset_time().unwrap(); // XXX unwrap
+		let mut todays_schedule: Vec<ProcessedScheduleItem> = self.config.schedule
 				.iter()
-				.map(|raw_item| ProcessedScheduleItem::from(raw.tz, raw_item, &sunset_time))
-				.collect(),
-		};
-		Self {
-			tz: raw.tz,
-			config,
+				.map(|raw_item| ProcessedScheduleItem::from(&self.tz, raw_item, &sunset_time))
+				.collect();
+
+		let first_item = todays_schedule.get(0).unwrap();
+		let mut first_repeat = first_item.clone();
+		first_repeat.time += TimeDelta::try_days(1).unwrap();
+		todays_schedule.push(first_repeat);
+
+		// TODO: Assert sorted
+
+		self.todays_schedule = Some(todays_schedule);
+	}
+
+	pub fn latest_scheduled_time(&self) -> Option<DateTime<Tz>> {
+		match &self.todays_schedule {
+			None => None,
+			Some(todays_schedule) => {
+				match todays_schedule.last() {
+					None => None,
+					Some(schedule_item) => Some(schedule_item.time)
+				}
+			}
 		}
+	}
+
+	pub fn get_surrounding_schedule_items(&self) -> anyhow::Result<(&ProcessedScheduleItem, &ProcessedScheduleItem)> {
+		todo!();
 	}
 }
 
 impl ProcessedScheduleItem {
-	pub fn from(tz: Tz, raw: &RawScheduleItem, sunset_time: &DateTime<Tz>) -> Self {
+	pub fn from(tz: &Tz, raw: &RawScheduleItem, sunset_time: &DateTime<Tz>) -> Self {
 		let hour = raw.hour.unwrap_or(0);
 		let minute = raw.minute.unwrap_or(0);
 		let time = match &raw.from {
@@ -171,13 +192,13 @@ impl ProcessedScheduleItem {
 	}
 }
 
-pub fn time_to_today_tz<T: TimeZone>(tz: T, hour: u8, minute: u8) -> anyhow::Result<DateTime<T>> {
+pub fn time_to_today_tz<T: TimeZone>(tz: &T, hour: u8, minute: u8) -> anyhow::Result<DateTime<T>> {
 	let now = chrono::Local::now();
 	let today = now.date_naive();
 	time_to_datetime_tz(tz, hour, minute, today)
 }
 
-fn time_to_datetime_tz<T: TimeZone>(tz: T, hour: u8, minute: u8, date: NaiveDate) -> anyhow::Result<DateTime<T>> {
+fn time_to_datetime_tz<T: TimeZone>(tz: &T, hour: u8, minute: u8, date: NaiveDate) -> anyhow::Result<DateTime<T>> {
 	let naive_time = match NaiveTime::from_hms_opt(hour.into(), minute.into(), 0) {
 		Some(t) => t,
 		None => return Err(anyhow::anyhow!("Could not construct NaiveTime from hour={}, minute={}.", hour, minute)),
