@@ -1,4 +1,4 @@
-use std::{env, fs::File, io::BufReader};
+use std::{env, fmt, fs::File, io::BufReader, str::FromStr};
 
 use anyhow::Context;
 use chrono::{DateTime, NaiveDate, NaiveTime, TimeZone, Utc};
@@ -14,47 +14,103 @@ struct LocationConfig {
 	timezone: String,
 }
 
-enum Action { // XXX TODO
+#[derive(Debug, PartialEq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum From {
+	Sunset
+}
+
+impl fmt::Display for From {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", match *self {
+            From::Sunset => "sunset",
+        })
+    }
+}
+
+impl FromStr for From {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+			"sunset" => Ok(From::Sunset),
+            _ => Err(()),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum Action {
+	Color,
+	Stop
+}
+
+impl fmt::Display for Action {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", match *self {
+            Action::Color => "color",
+			Action::Stop => "stop",
+        })
+    }
+}
+
+impl FromStr for Action {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+			"color" => Ok(Action::Color),
+			"stop" => Ok(Action::Stop),
+            _ => Err(()),
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
 struct ChangeItem {
-	action: String,
+	action: Action,
     mirek: Option<u16>,
     brightness: Option<u8>,
 }
 
 #[derive(Debug, Deserialize)]
-struct ScheduleItem {
+pub struct RawScheduleItem {
 	hour: Option<i8>,
 	minute: Option<i8>,
-	from: Option<String>,
+	from: Option<From>,
+	change: ChangeItem,
+}
+
+pub struct ProcessedScheduleItem {
+	time: DateTime<Tz>,
 	change: ChangeItem,
 }
 
 #[derive(Debug, Deserialize)]
-struct ScheduleConfig {
+struct ScheduleConfig<ItemT> {
 	location: LocationConfig,
-	schedule: Vec<ScheduleItem>,
+	schedule: Vec<ItemT>,
 }
 
-pub struct ScheduleInfo {
+#[derive(Debug)]
+pub struct ScheduleInfo<ItemT> {
     tz: Tz,
-	config: ScheduleConfig,
+	config: ScheduleConfig<ItemT>,
 }
 
-impl ScheduleInfo {
-	pub fn new() -> anyhow::Result<ScheduleInfo> {
+impl ScheduleInfo<RawScheduleItem> {
+	pub fn new() -> anyhow::Result<Self> {
 		Self::from_env("SCHEDULE_YAML_PATH")
 	}
 
-	pub fn from_env(env_path_var: &str) -> anyhow::Result<ScheduleInfo> {
+	pub fn from_env(env_path_var: &str) -> anyhow::Result<Self> {
 		let schedule_path = env::var(env_path_var)
 			.context(format!("Unable to load env var: {env_path_var}"))?;
 		let schedule_file = File::open(&schedule_path)
 			.context(format!("Unable to open file at {}", &schedule_path))?;
 		let reader = BufReader::new(schedule_file);
-		let schedule_config: ScheduleConfig = serde_yaml::from_reader(reader)
+		let schedule_config: ScheduleConfig<RawScheduleItem> = serde_yaml::from_reader(reader)
 			.context("Unable to parse schedule yaml file.")?;
 		let tz = match schedule_config.location.timezone.parse::<Tz>() {
 			Ok(tz) => Ok(tz),
@@ -72,6 +128,18 @@ impl ScheduleInfo {
 			Ok(time) => Ok(time),
 			Err(e) => Err(anyhow::Error::msg(format!("{e}"))),
 		}
+	}
+}
+
+impl ScheduleInfo<ProcessedScheduleItem> {
+	pub fn convert(orig: ScheduleInfo<RawScheduleItem>) -> Self {
+		todo!();
+	}
+}
+
+impl ProcessedScheduleItem {
+	pub fn from(orig: RawScheduleItem, sunset_time: DateTime<Tz>) -> Self {
+		todo!();
 	}
 }
 

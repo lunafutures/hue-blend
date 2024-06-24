@@ -46,4 +46,5 @@ fn main2() {
     };
     let schedule = ScheduleInfo::new().unwrap();
     println!("{}", schedule.get_sunset_time().unwrap());
+    println!("{:#?}", schedule);
 }
