@@ -1,7 +1,7 @@
 use std::{env, fmt, fs::File, io::BufReader, str::FromStr};
 
 use anyhow::Context;
-use chrono::{DateTime, NaiveDate, NaiveTime, TimeZone, Utc};
+use chrono::{DateTime, NaiveDate, NaiveTime, TimeDelta, TimeZone, Utc};
 use chrono_tz::Tz;
 use serde::Deserialize;
 
@@ -14,7 +14,7 @@ struct LocationConfig {
 	timezone: String,
 }
 
-#[derive(Debug, PartialEq, Deserialize)]
+#[derive(Debug, PartialEq, Deserialize, Clone)]
 #[serde(rename_all = "snake_case")]
 enum From {
 	Sunset
@@ -39,7 +39,7 @@ impl FromStr for From {
     }
 }
 
-#[derive(Debug, PartialEq, Deserialize)]
+#[derive(Debug, PartialEq, Deserialize, Clone)]
 #[serde(rename_all = "snake_case")]
 enum Action {
 	Color,
@@ -67,14 +67,14 @@ impl FromStr for Action {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 struct ChangeItem {
 	action: Action,
     mirek: Option<u16>,
     brightness: Option<u8>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct RawScheduleItem {
 	hour: Option<i8>,
 	minute: Option<i8>,
@@ -82,6 +82,7 @@ pub struct RawScheduleItem {
 	change: ChangeItem,
 }
 
+#[derive(Debug)]
 pub struct ProcessedScheduleItem {
 	time: DateTime<Tz>,
 	change: ChangeItem,
@@ -132,14 +133,41 @@ impl ScheduleInfo<RawScheduleItem> {
 }
 
 impl ScheduleInfo<ProcessedScheduleItem> {
-	pub fn convert(orig: ScheduleInfo<RawScheduleItem>) -> Self {
-		todo!();
+	pub fn from(raw: ScheduleInfo<RawScheduleItem>) -> Self {
+		let sunset_time = raw.get_sunset_time().unwrap(); // XXX unwrap
+		let config: ScheduleConfig<ProcessedScheduleItem> = ScheduleConfig {
+			location: raw.config.location,
+			schedule: raw.config.schedule
+				.iter()
+				.map(|raw_item| ProcessedScheduleItem::from(raw.tz, raw_item, &sunset_time))
+				.collect(),
+		};
+		Self {
+			tz: raw.tz,
+			config,
+		}
 	}
 }
 
 impl ProcessedScheduleItem {
-	pub fn from(orig: RawScheduleItem, sunset_time: DateTime<Tz>) -> Self {
-		todo!();
+	pub fn from(tz: Tz, raw: &RawScheduleItem, sunset_time: &DateTime<Tz>) -> Self {
+		let hour = raw.hour.unwrap_or(0);
+		let minute = raw.minute.unwrap_or(0);
+		let time = match &raw.from {
+			Some(s) if s == &From::Sunset => {
+				let delta = TimeDelta::hours(hour as i64) + TimeDelta::minutes(minute as i64);
+				let r: DateTime<Tz> = *sunset_time + delta;
+				r
+			},
+			Some(_) => panic!("bad"),
+			None => {
+				time_to_today_tz(tz, hour as u8, minute as u8).unwrap()
+			},
+		};
+		ProcessedScheduleItem {
+			change: raw.change.clone(),
+			time,
+		}
 	}
 }
 

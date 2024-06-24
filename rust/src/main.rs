@@ -6,7 +6,7 @@ mod sunset;
 use chrono::Local;
 use rocket::serde::{json::Json, Serialize};
 
-use schedule::ScheduleInfo;
+use schedule::{ProcessedScheduleItem, ScheduleInfo};
 
 #[get("/")]
 fn index() -> &'static str {
@@ -45,6 +45,6 @@ fn main2() {
         Ok(_) => println!("Successfully loaded .env"),
     };
     let schedule = ScheduleInfo::new().unwrap();
-    println!("{}", schedule.get_sunset_time().unwrap());
-    println!("{:#?}", schedule);
+    let schedule_proc = ScheduleInfo::<ProcessedScheduleItem>::from(schedule);
+    println!("{:#?}", schedule_proc);
 }
