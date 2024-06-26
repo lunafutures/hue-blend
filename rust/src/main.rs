@@ -32,20 +32,26 @@ fn time() -> String {
     str
 }
 
-#[launch]
-fn rocket() -> _ {
-    main2();
-    rocket::build()
-        .mount("/", routes![index, time, todo])
-}
+// #[launch]
+// fn rocket() -> _ {
+//     main2();
+//     rocket::build()
+//         .mount("/", routes![index, time, todo])
+// }
 
-fn main2() {
+fn main() {
     match dotenvy::dotenv() {
         Err(e) => println!("WARNING! .env NOT LOADED: {}", e),
         Ok(_) => println!("Successfully loaded .env"),
     };
     let mut schedule = ScheduleInfo::new().unwrap();
-    schedule.set_today();
-    let (a, b) = schedule.get_surrounding_schedule_items().unwrap();
-    println!("{a:?} - {b:?}");
+    schedule.set_today().unwrap();
+    println!("schedule: {schedule:#?}");
+
+    let now = schedule.now().unwrap();
+    let (a, b) = schedule.get_surrounding_schedule_items(Some(now.clone())).unwrap();
+    println!("a: {a:#?}\nb: {b:#?}");
+
+    let action = schedule.get_action_for_time(a, b, &now).unwrap();
+    println!("action: {action:#?}");
 }

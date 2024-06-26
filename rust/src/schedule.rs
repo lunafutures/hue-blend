@@ -1,7 +1,7 @@
 use std::{env, fmt, fs::File, io::BufReader, str::FromStr};
 
 use anyhow::Context;
-use chrono::{DateTime, NaiveDate, NaiveTime, TimeDelta, TimeZone, Utc};
+use chrono::{DateTime, NaiveDate, NaiveTime, TimeDelta, TimeZone};
 use chrono_tz::Tz;
 use serde::Deserialize;
 
@@ -130,27 +130,32 @@ impl ScheduleInfo {
 	}
 
 	pub fn get_sunset_time(&self) -> anyhow::Result<DateTime<Tz>> {
-		match get_sunset_time(self.config.location.latitude, self.config.location.longitude, self.tz, Utc::now()) {
+		match get_sunset_time(self.config.location.latitude, self.config.location.longitude, self.tz, chrono::Local::now()) {
 			Ok(time) => Ok(time),
 			Err(e) => Err(anyhow::Error::msg(format!("{e}"))),
 		}
 	}
 
-	pub fn set_today(&mut self) {
-		let sunset_time = self.get_sunset_time().unwrap(); // XXX unwrap
-		let mut todays_schedule: Vec<ProcessedScheduleItem> = self.config.schedule
+	pub fn set_today(&mut self) -> anyhow::Result<()> {
+		let sunset_time = self.get_sunset_time().context("Unable to get sunset time.")?;
+		println!("sunset_time: {sunset_time:?}");
+		let mut todays_schedule: Vec<ProcessedScheduleItem> = match self.config.schedule
 				.iter()
 				.map(|raw_item| ProcessedScheduleItem::from(&self.tz, raw_item, &sunset_time))
-				.collect();
+				.collect() {
+			Ok(o) => o,
+			Err(e) => Err(e)?,
+		};
 
-		let first_item = todays_schedule.get(0).unwrap();
+		let first_item = todays_schedule.get(0).context("Unable to get first element of todays_schedule.")?;
 		let mut first_repeat = first_item.clone();
-		first_repeat.time += TimeDelta::try_days(1).unwrap();
+		first_repeat.time += TimeDelta::try_days(1).context("Unable to create a 1-day delta to add to create the last item.")?;
 		todays_schedule.push(first_repeat);
 
 		// TODO: Assert sorted
 
 		self.todays_schedule = Some(todays_schedule);
+		Ok(())
 	}
 
 	pub fn latest_scheduled_time(&self) -> Option<DateTime<Tz>> {
@@ -165,9 +170,12 @@ impl ScheduleInfo {
 		}
 	}
 
-	pub fn get_surrounding_schedule_items(&self) -> anyhow::Result<(&ProcessedScheduleItem, &ProcessedScheduleItem)> {
-		let now = tz_now(&self.tz).unwrap();
-		let todays_schedule = self.todays_schedule.as_ref().unwrap();
+	pub fn get_surrounding_schedule_items(&self, now: Option<DateTime<Tz>>) -> anyhow::Result<(&ProcessedScheduleItem, &ProcessedScheduleItem)> {
+		let now : DateTime<Tz> = match now {
+			Some(now) => now,
+			None => self.now().context("Unable to get now to find surrounding schedule items.")?,
+		};
+		let todays_schedule = self.todays_schedule.as_ref().context("todays_schedule has not been set.")?;
 		for i in 0..(todays_schedule.len() - 1) {
 			let before = todays_schedule.get(i).expect("Before too much");
 			let after = todays_schedule.get(i + 1).expect("After too much");
@@ -177,22 +185,72 @@ impl ScheduleInfo {
 			}
 		}
 
-		let last_time = todays_schedule.last().unwrap().time;
+		let last_time = todays_schedule.last().context("Unable to get last element of todays_schedule")?.time;
 		if last_time < now {
 			return Err(anyhow::anyhow!("now ({now}) is later than last_time ({last_time})."))
 		}
 
-		let first_time = todays_schedule.first().unwrap().time;
+		let first_time = todays_schedule.first().context("Unable to get first element of todays_schedule")?.time;
 		if now < first_time {
 			return Err(anyhow::anyhow!("now ({now}) is later than first_time ({first_time})."))
 		}
 
 		Err(anyhow::anyhow!("now ({now}) has reached an unknown error."))
 	}
+
+	pub fn get_action_for_time(&self, a: &ProcessedScheduleItem, b: &ProcessedScheduleItem, now: &DateTime<Tz>) -> anyhow::Result<ChangeAction> {
+		match a.change.action {
+			Action::Stop => Ok(ChangeAction::None),
+			Action::Color => match b.change.action {
+				Action::Stop => {
+					let mirek = a.change.mirek.context(format!("Expected mirek in change: {:#?}", a.change))?;
+					let brightness = a.change.brightness.context(format!("Expected brightness in change: {:#?}", a.change))?;
+					Ok(ChangeAction::Color { mirek, brightness })
+				},
+				Action::Color => {
+					let a_factor: f64 = (b.time - now).num_milliseconds() as f64 / (b.time - a.time).num_milliseconds() as f64;
+					let b_factor: f64 = 1.0 - a_factor;
+
+					let a_mirek = a.change.mirek.context(format!("Expected mirek in change: {:#?}", a.change))?;
+					let a_brightness = a.change.brightness.context(format!("Expected brightness in change: {:#?}", a.change))?;
+
+					let b_mirek = b.change.mirek.context(format!("Expected mirek in change: {:#?}", b.change))?;
+					let b_brightness = b.change.brightness.context(format!("Expected brightness in change: {:#?}", b.change))?;
+
+					Ok(ChangeAction::Color { 
+						mirek: fraction(
+							a_factor, a_mirek,
+							b_factor, b_mirek) as u16,
+						brightness: fraction(
+							a_factor, a_brightness,
+							b_factor, b_brightness) as u8,
+					})
+				}
+			}
+		}
+	}
+
+	pub fn now(&self) -> anyhow::Result<DateTime<Tz>> {
+		match tz_now(&self.tz) {
+			Some(o) => Ok(o),
+			None => Err(anyhow::anyhow!("Unable to construct now for timezone: {}", &self.tz)),
+		}
+	}
+}
+
+pub fn fraction<T>(a_factor: f64, a_value: T, b_factor: f64, b_value: T) -> f64
+where T: Into<f64>{
+	a_factor * a_value.into() + b_factor * b_value.into()
+}
+
+#[derive(Debug)]
+pub enum ChangeAction {
+	None,
+	Color {mirek: u16, brightness: u8},
 }
 
 impl ProcessedScheduleItem {
-	pub fn from(tz: &Tz, raw: &RawScheduleItem, sunset_time: &DateTime<Tz>) -> Self {
+	pub fn from(tz: &Tz, raw: &RawScheduleItem, sunset_time: &DateTime<Tz>) -> anyhow::Result<Self> {
 		let hour = raw.hour.unwrap_or(0);
 		let minute = raw.minute.unwrap_or(0);
 		let time = match &raw.from {
@@ -201,27 +259,28 @@ impl ProcessedScheduleItem {
 				let r: DateTime<Tz> = *sunset_time + delta;
 				r
 			},
-			Some(_) => panic!("bad"),
-			None => {
-				time_to_today_tz(tz, hour as u8, minute as u8).unwrap()
-			},
+			Some(s) => Err(anyhow::anyhow!(
+				"Unexpected `from` value {s} while constructing {}.",
+				std::any::type_name::<ProcessedScheduleItem>()))?,
+			None => time_to_today_tz(tz, hour as u8, minute as u8)
+				.context(format!("Unable to convert hour {hour} and minute {minute} to time tz."))?,
 		};
-		ProcessedScheduleItem {
+		Ok(ProcessedScheduleItem {
 			change: raw.change.clone(),
 			time,
-		}
+		})
 	}
+}
+
+pub fn tz_now<T: TimeZone>(tz: &T) -> Option<DateTime<T>> {
+	let now = chrono::Local::now().naive_local();
+	tz.from_local_datetime(&now).earliest()
 }
 
 pub fn time_to_today_tz<T: TimeZone>(tz: &T, hour: u8, minute: u8) -> anyhow::Result<DateTime<T>> {
 	let now = chrono::Local::now();
 	let today = now.date_naive();
 	time_to_datetime_tz(tz, hour, minute, today)
-}
-
-fn tz_now<T: TimeZone>(tz: &T) -> Option<DateTime<T>> {
-	let now = chrono::Local::now().naive_local();
-	tz.from_local_datetime(&now).earliest()
 }
 
 fn time_to_datetime_tz<T: TimeZone>(tz: &T, hour: u8, minute: u8, date: NaiveDate) -> anyhow::Result<DateTime<T>> {
