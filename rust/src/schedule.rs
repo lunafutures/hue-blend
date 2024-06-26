@@ -98,7 +98,7 @@ struct ScheduleConfig {
 pub struct ScheduleInfo {
     tz: Tz,
 	config: ScheduleConfig,
-	todays_schedule: Option<Vec<ProcessedScheduleItem>>,
+	pub todays_schedule: Option<Vec<ProcessedScheduleItem>>,
 }
 
 impl ScheduleInfo {

@@ -1,14 +1,14 @@
 mod schedule;
 mod sunset;
 
-#[macro_use] extern crate rocket;
+#[macro_use] extern crate rocket; // XXX TODO necessary?
 
 use chrono::Local;
-use rocket::serde::{json::Json, Serialize};
+use rocket::{serde::{json::Json, Serialize}, tokio::sync::RwLock, State};
 
-use schedule::{ProcessedScheduleItem, ScheduleInfo};
+use schedule::ScheduleInfo;
 
-#[get("/")]
+#[get("/")] // XXX remove
 fn index() -> &'static str {
     "Hello, world!"
 }
@@ -19,12 +19,12 @@ struct Task {
     dog: String,
 }
 
-#[get("/todo")]
+#[get("/todo")] // XXX remove
 fn todo() -> Json<Task> {
     Json(Task { dog: String::from("woof") })
 }
 
-#[get("/time")]
+#[get("/time")] // XXX remove
 fn time() -> String {
     let now = Local::now();
     let str = format!("now is {}", now.format("%Y-%m-%d %H:%M:%S"));
@@ -32,14 +32,55 @@ fn time() -> String {
     str
 }
 
-// #[launch]
-// fn rocket() -> _ {
-//     main2();
-//     rocket::build()
-//         .mount("/", routes![index, time, todo])
-// }
+#[get("/now")]
+async fn now(state: &State<RwLock<ScheduleInfo>>) -> String {
+    let x = state.read().await;
+    format!("{:?}", (*x).now())
+}
 
-fn main() {
+struct AppState {
+    // schedule_info: Option<ScheduleInfo>,
+    // asdf: String,
+    asdf: rocket::tokio::sync::RwLock<String>,
+}
+
+#[get("/schedule")]
+async fn get_schedule(state: &State<AppState>) -> String { // XXX remove
+    {
+        let x = state.asdf.read().await;
+        println!("x: {}", x);
+    };
+    let t = {
+        let mut w = state.asdf.write().await;
+        (*w).push_str("1");
+        (*w).clone()
+    };
+
+    t
+}
+
+#[get("/schedule2")]
+async fn get_schedule2(state: &State<RwLock<ScheduleInfo>>) -> String {
+    let mut x = state.write().await;
+    match &(*x).todays_schedule {
+        Some(s) => format!("{s:#?}"),
+        None => match (*x).set_today() {
+            Ok(_o) => format!("{:#?}", (*x).todays_schedule),
+            Err(e) => String::from(format!("Bad: {e}")),
+        },
+    }
+}
+
+#[launch]
+fn rocket() -> _ {
+    main2();
+    rocket::build()
+        .manage(AppState { asdf: RwLock::new(String::from("asdf")) })
+        .manage(RwLock::new(ScheduleInfo::new().unwrap()))
+        .mount("/", routes![index, time, todo, get_schedule, get_schedule2, now])
+}
+
+fn main2() {
     match dotenvy::dotenv() {
         Err(e) => println!("WARNING! .env NOT LOADED: {}", e),
         Ok(_) => println!("Successfully loaded .env"),
