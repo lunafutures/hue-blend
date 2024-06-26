@@ -4,7 +4,7 @@ mod sunset;
 #[macro_use] extern crate rocket; // XXX TODO necessary?
 
 use chrono::Local;
-use rocket::{serde::{json::Json, Serialize}, tokio::sync::RwLock, State};
+use rocket::{serde::{self, json::Json}, tokio::sync::RwLock, State};
 
 use schedule::ScheduleInfo;
 
@@ -13,7 +13,7 @@ fn index() -> &'static str {
     "Hello, world!"
 }
 
-#[derive(Serialize)]
+#[derive(serde::Serialize)]
 #[serde(crate = "rocket::serde")]
 struct Task {
     dog: String,

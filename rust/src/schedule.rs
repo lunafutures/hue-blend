@@ -3,19 +3,20 @@ use std::{env, fmt, fs::File, io::BufReader, str::FromStr};
 use anyhow::Context;
 use chrono::{DateTime, NaiveDate, NaiveTime, TimeDelta, TimeZone};
 use chrono_tz::Tz;
-use serde::Deserialize;
+use rocket::serde;
 
 use crate::sunset::get_sunset_time;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
+#[serde(crate = "rocket::serde")]
 struct LocationConfig {
 	longitude: f64,
 	latitude: f64,
 	timezone: String,
 }
 
-#[derive(Debug, PartialEq, Deserialize, Clone)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, PartialEq, serde::Deserialize, Clone)]
+#[serde(crate = "rocket::serde", rename_all = "lowercase")]
 enum From {
 	Sunset
 }
@@ -39,8 +40,8 @@ impl FromStr for From {
     }
 }
 
-#[derive(Debug, PartialEq, Deserialize, Clone)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, PartialEq, Clone, serde::Deserialize)]
+#[serde(crate = "rocket::serde", rename_all = "lowercase")]
 enum Action {
 	Color,
 	Stop
@@ -66,15 +67,16 @@ impl FromStr for Action {
         }
     }
 }
-
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(crate = "rocket::serde")]
 struct ChangeItem {
 	action: Action,
     mirek: Option<u16>,
     brightness: Option<u8>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(crate = "rocket::serde")]
 pub struct RawScheduleItem {
 	hour: Option<i8>,
 	minute: Option<i8>,
@@ -88,7 +90,8 @@ pub struct ProcessedScheduleItem {
 	change: ChangeItem,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
+#[serde(crate = "rocket::serde")]
 struct ScheduleConfig {
 	location: LocationConfig,
 	schedule: Vec<RawScheduleItem>,
