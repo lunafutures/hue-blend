@@ -110,8 +110,10 @@ pub struct Schedule {
 #[serde(crate = "rocket::serde")]
 pub struct DebugInfo {
 	updated: bool,
+	tz: String,
     raw_schedule: Vec<RawScheduleItem>,
 	processed_schedule: Vec<ProcessedScheduleItem>,
+	now: DateTime<Tz>,
 }
 
 impl Schedule {
@@ -123,10 +125,14 @@ impl Schedule {
 			None => return Err(anyhow::anyhow!("todays_schedule is unexpected None")),
 		};
 
+		let now = self.now()?;
+
 		Ok(DebugInfo {
+			tz: self.tz.to_string(),
 			updated,
 			raw_schedule: self.raw_schedule.clone(),
-			processed_schedule: todays_schedule
+			processed_schedule: todays_schedule,
+			now,
 		})
 	}
 	pub fn new() -> anyhow::Result<Self> {
