@@ -108,12 +108,21 @@ pub struct Schedule {
 
 #[derive(Debug, serde::Serialize)]
 #[serde(crate = "rocket::serde")]
+struct DebugSurrounding {
+	first: ProcessedScheduleItem,
+	last: ProcessedScheduleItem,
+}
+
+#[derive(Debug, serde::Serialize)]
+#[serde(crate = "rocket::serde")]
 pub struct DebugInfo {
 	updated: bool,
 	tz: String,
     raw_schedule: Vec<RawScheduleItem>,
 	processed_schedule: Vec<ProcessedScheduleItem>,
 	now: DateTime<Tz>,
+	surrounding_items: DebugSurrounding,
+	change_action: ChangeAction,
 }
 
 impl Schedule {
@@ -126,6 +135,11 @@ impl Schedule {
 		};
 
 		let now = self.now()?;
+		let surrounding_items = {
+			let (first, last) = self.get_surrounding_schedule_items(Some(now))?;
+			DebugSurrounding { first: first.clone(), last: last.clone() }
+		};
+		let change_action = self.get_action_for_now(now)?;
 
 		Ok(DebugInfo {
 			tz: self.tz.to_string(),
@@ -133,8 +147,11 @@ impl Schedule {
 			raw_schedule: self.raw_schedule.clone(),
 			processed_schedule: todays_schedule,
 			now,
+			surrounding_items,
+			change_action,
 		})
 	}
+
 	pub fn new() -> anyhow::Result<Self> {
 		Self::from_env("SCHEDULE_YAML_PATH")
 	}
