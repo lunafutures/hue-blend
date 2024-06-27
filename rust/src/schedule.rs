@@ -7,7 +7,7 @@ use rocket::serde;
 
 use crate::sunset::get_sunset_time;
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
 #[serde(crate = "rocket::serde")]
 struct LocationConfig {
 	longitude: f64,
@@ -15,7 +15,7 @@ struct LocationConfig {
 	timezone: String,
 }
 
-#[derive(Debug, PartialEq, Clone, serde::Deserialize)]
+#[derive(Debug, PartialEq, Clone, serde::Deserialize, serde::Serialize)]
 #[serde(crate = "rocket::serde", rename_all = "snake_case")]
 enum From {
 	Sunset
@@ -40,7 +40,7 @@ impl FromStr for From {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, serde::Deserialize)]
+#[derive(Debug, PartialEq, Clone, serde::Deserialize, serde::Serialize)]
 #[serde(crate = "rocket::serde", rename_all = "snake_case")]
 enum Action {
 	Color,
@@ -67,7 +67,7 @@ impl FromStr for Action {
         }
     }
 }
-#[derive(Debug, Clone, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 #[serde(crate = "rocket::serde")]
 struct ChangeItem {
 	action: Action,
@@ -75,7 +75,7 @@ struct ChangeItem {
     brightness: Option<u8>,
 }
 
-#[derive(Debug, Clone, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 #[serde(crate = "rocket::serde")]
 pub struct RawScheduleItem {
 	hour: Option<i8>,
@@ -84,7 +84,8 @@ pub struct RawScheduleItem {
 	change: ChangeItem,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(crate = "rocket::serde")]
 pub struct ProcessedScheduleItem {
 	time: DateTime<Tz>,
 	change: ChangeItem,
@@ -100,11 +101,22 @@ struct ScheduleConfig {
 #[derive(Debug)]
 pub struct ScheduleInfo {
     tz: Tz,
-	config: ScheduleConfig,
+	pub config: ScheduleConfig,
 	pub todays_schedule: Option<Vec<ProcessedScheduleItem>>,
 }
 
+#[derive(Debug, serde::Serialize)]
+#[serde(crate = "rocket::serde")]
+pub struct DebugInfo {
+    raw_schedule: Vec<RawScheduleItem>,
+}
+
 impl ScheduleInfo {
+	pub fn get_debug_info(&self) -> anyhow::Result<DebugInfo> {
+		Ok(DebugInfo {
+			raw_schedule: self.config.schedule.clone(),
+		})
+	}
 	pub fn new() -> anyhow::Result<Self> {
 		Self::from_env("SCHEDULE_YAML_PATH")
 	}

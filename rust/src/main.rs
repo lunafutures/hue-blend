@@ -5,7 +5,7 @@ mod sunset;
 
 use chrono::{DateTime, Local};
 use chrono_tz::Tz;
-use rocket::{serde::{self, json::Json}, tokio::sync::RwLock, response, State};
+use rocket::{serde::{self, json::Json}, tokio::sync::RwLock, State};
 
 use schedule::ScheduleInfo;
 
@@ -65,8 +65,7 @@ struct NowResponse {
     just_updated: bool,
 }
 
-#[get("/now")]
-async fn now(state: &State<RwLock<ScheduleInfo>>) -> Responses<NowResponse> {
+async fn update_if_necessary(state: &State<RwLock<ScheduleInfo>>) -> anyhow::Result<bool> {
     let should_update: bool = {
         let reader = state.read().await;
         (*reader).todays_schedule.is_none()
@@ -75,10 +74,32 @@ async fn now(state: &State<RwLock<ScheduleInfo>>) -> Responses<NowResponse> {
     if should_update {
         let mut writer = state.write().await;
         match (*writer).set_today() {
-            Ok(_) => (),
-            Err(e) => return Responses::bad(e.to_string()),
+            Ok(_) => Ok(true),
+            Err(e) => Err(e),
         }
+    } else {
+        Ok(false)
     }
+}
+
+#[get("/now")]
+async fn now(state: &State<RwLock<ScheduleInfo>>) -> Responses<NowResponse> {
+    let updated = match update_if_necessary(state).await {
+        Ok(o) => o,
+        Err(e) => return Responses::bad(e.to_string()),
+    };
+    // let should_update: bool = {
+    //     let reader = state.read().await;
+    //     (*reader).todays_schedule.is_none()
+    // };
+    
+    // if should_update {
+    //     let mut writer = state.write().await;
+    //     match (*writer).set_today() {
+    //         Ok(_) => (),
+    //         Err(e) => return Responses::bad(e.to_string()),
+    //     }
+    // }
 
     let reader = state.read().await;
     let now = {
@@ -92,7 +113,7 @@ async fn now(state: &State<RwLock<ScheduleInfo>>) -> Responses<NowResponse> {
         Err(e) => return Responses::bad(e.to_string()),
     };
 
-    Responses::good(NowResponse { now, change_action, just_updated: should_update })
+    Responses::good(NowResponse { now, change_action, just_updated: updated })
 }
 
 struct AppState {
@@ -101,19 +122,21 @@ struct AppState {
     asdf: rocket::tokio::sync::RwLock<String>,
 }
 
-#[get("/schedule")]
-async fn get_schedule(state: &State<AppState>) -> String { // XXX remove
-    {
-        let x = state.asdf.read().await;
-        println!("x: {}", x);
-    };
-    let t = {
-        let mut w = state.asdf.write().await;
-        (*w).push_str("1");
-        (*w).clone()
+#[get("/debug")]
+async fn get_debug_info(state: &State<RwLock<ScheduleInfo>>) -> Responses<schedule::DebugInfo> {
+    let updated = match update_if_necessary(state).await {
+        Ok(o) => o,
+        Err(e) => return Responses::bad(e.to_string()),
     };
 
-    t
+    let reader = state.read().await;
+    let debug_info = match (*reader).get_debug_info() {
+        Ok(o) => o,
+        Err(e) => return Responses::bad(e.to_string()),
+    };
+
+    Responses::good(debug_info)
+
 }
 
 #[get("/schedule2")]
@@ -134,7 +157,7 @@ fn rocket() -> _ {
     rocket::build()
         .manage(AppState { asdf: RwLock::new(String::from("asdf")) })
         .manage(RwLock::new(ScheduleInfo::new().unwrap()))
-        .mount("/", routes![index, time, todo, get_schedule, get_schedule2, now])
+        .mount("/", routes![index, time, todo, get_debug_info, get_schedule2, now])
 }
 
 fn main2() {
