@@ -93,7 +93,7 @@ pub struct ProcessedScheduleItem {
 
 #[derive(Debug, serde::Deserialize)]
 #[serde(crate = "rocket::serde")]
-struct ScheduleConfig {
+pub struct ScheduleConfig {
 	location: LocationConfig,
 	schedule: Vec<RawScheduleItem>,
 }
@@ -108,15 +108,24 @@ pub struct ScheduleInfo {
 #[derive(Debug, serde::Serialize)]
 #[serde(crate = "rocket::serde")]
 pub struct DebugInfo {
-	pub updated: bool,
+	updated: bool,
     raw_schedule: Vec<RawScheduleItem>,
+	processed_schedule: Vec<ProcessedScheduleItem>,
 }
 
 impl ScheduleInfo {
-	pub fn get_debug_info(&self) -> anyhow::Result<DebugInfo> {
+	pub fn get_debug_info(&mut self) -> anyhow::Result<DebugInfo> {
+		let updated = self.try_update()?;
+
+		let todays_schedule = match self.todays_schedule.clone() {
+			Some(s) => s,
+			None => return Err(anyhow::anyhow!("todays_schedule is unexpected None")),
+		};
+
 		Ok(DebugInfo {
+			updated,
 			raw_schedule: self.config.schedule.clone(),
-			updated: false,
+			processed_schedule: todays_schedule
 		})
 	}
 	pub fn new() -> anyhow::Result<Self> {
@@ -151,6 +160,17 @@ impl ScheduleInfo {
 			Ok(time) => Ok(time),
 			Err(e) => Err(anyhow::Error::msg(format!("{e}"))),
 		}
+	}
+
+	pub fn try_update(&mut self) -> anyhow::Result<bool> {
+		let updated = if self.todays_schedule.is_none() {
+			self.set_today()?;
+			true
+		} else {
+			false
+		};
+
+		Ok(updated)
 	}
 
 	pub fn set_today(&mut self) -> anyhow::Result<()> {

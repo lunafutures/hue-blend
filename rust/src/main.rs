@@ -118,32 +118,13 @@ async fn now(state: &State<RwLock<ScheduleInfo>>) -> Responses<NowResponse> {
 
 #[get("/debug")]
 async fn get_debug_info(state: &State<RwLock<ScheduleInfo>>) -> Responses<schedule::DebugInfo> {
-    let updated = match update_if_necessary(state).await {
+    let mut writer = state.write().await;
+    let debug_info = match (*writer).get_debug_info() {
         Ok(o) => o,
         Err(e) => return Responses::bad(e.to_string()),
     };
-
-    let reader = state.read().await;
-    let mut debug_info = match (*reader).get_debug_info() {
-        Ok(o) => o,
-        Err(e) => return Responses::bad(e.to_string()),
-    };
-    debug_info.updated = updated;
 
     Responses::good(debug_info)
-
-}
-
-#[get("/schedule2")]
-async fn get_schedule2(state: &State<RwLock<ScheduleInfo>>) -> String {
-    let mut x = state.write().await;
-    match &(*x).todays_schedule {
-        Some(s) => format!("{s:#?}"),
-        None => match (*x).set_today() {
-            Ok(_o) => format!("{:#?}", (*x).todays_schedule),
-            Err(e) => String::from(format!("Bad: {e}")),
-        },
-    }
 }
 
 #[launch]
@@ -151,7 +132,7 @@ fn rocket() -> _ {
     main2();
     rocket::build()
         .manage(RwLock::new(ScheduleInfo::new().unwrap()))
-        .mount("/", routes![index, time, todo, get_debug_info, get_schedule2, now])
+        .mount("/", routes![index, time, todo, get_debug_info, now])
 }
 
 fn main2() {
