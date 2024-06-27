@@ -108,6 +108,7 @@ pub struct ScheduleInfo {
 #[derive(Debug, serde::Serialize)]
 #[serde(crate = "rocket::serde")]
 pub struct DebugInfo {
+	pub updated: bool,
     raw_schedule: Vec<RawScheduleItem>,
 }
 
@@ -115,6 +116,7 @@ impl ScheduleInfo {
 	pub fn get_debug_info(&self) -> anyhow::Result<DebugInfo> {
 		Ok(DebugInfo {
 			raw_schedule: self.config.schedule.clone(),
+			updated: false,
 		})
 	}
 	pub fn new() -> anyhow::Result<Self> {

@@ -130,10 +130,11 @@ async fn get_debug_info(state: &State<RwLock<ScheduleInfo>>) -> Responses<schedu
     };
 
     let reader = state.read().await;
-    let debug_info = match (*reader).get_debug_info() {
+    let mut debug_info = match (*reader).get_debug_info() {
         Ok(o) => o,
         Err(e) => return Responses::bad(e.to_string()),
     };
+    debug_info.updated = updated;
 
     Responses::good(debug_info)
 
