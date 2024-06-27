@@ -214,7 +214,18 @@ impl Schedule {
 		first_repeat.time += TimeDelta::try_days(1).context("Unable to create a 1-day delta to add to create the last item.")?;
 		todays_schedule.push(first_repeat);
 
-		// TODO: Assert sorted
+		for i in 0..(todays_schedule.len() - 1) {
+			let before = todays_schedule
+				.get(i)
+				.ok_or(anyhow::anyhow!("Index out of bounds while asserted sorted: {i}"))?;
+			let after = todays_schedule
+				.get(i + 1)
+				.ok_or(anyhow::anyhow!("Index out of bounds while asserted sorted: {}", i + 1))?;
+			if before.time > after.time {
+				return Err(anyhow::anyhow!(
+					"Processed schedule is not sorted by item: [{i}] {before:#?} is later than [{}] {after:#?}", i + 1));
+			}
+		}
 
 		self.todays_schedule = Some(todays_schedule);
 		Ok(())
