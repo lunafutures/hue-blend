@@ -7,7 +7,7 @@ use chrono::{DateTime, Local};
 use chrono_tz::Tz;
 use rocket::{serde::{self, json::Json}, tokio::sync::RwLock, State};
 
-use schedule::ScheduleInfo;
+use schedule::Schedule;
 
 #[get("/")] // XXX remove
 fn index() -> &'static str {
@@ -65,7 +65,7 @@ struct NowResponse {
     just_updated: bool,
 }
 
-async fn update_if_necessary(state: &State<RwLock<ScheduleInfo>>) -> anyhow::Result<bool> {
+async fn update_if_necessary(state: &State<RwLock<Schedule>>) -> anyhow::Result<bool> {
     let should_update: bool = {
         let reader = state.read().await;
         (*reader).todays_schedule.is_none()
@@ -83,7 +83,7 @@ async fn update_if_necessary(state: &State<RwLock<ScheduleInfo>>) -> anyhow::Res
 }
 
 #[get("/now")]
-async fn now(state: &State<RwLock<ScheduleInfo>>) -> Responses<NowResponse> {
+async fn now(state: &State<RwLock<Schedule>>) -> Responses<NowResponse> {
     let updated = match update_if_necessary(state).await {
         Ok(o) => o,
         Err(e) => return Responses::bad(e.to_string()),
@@ -117,7 +117,7 @@ async fn now(state: &State<RwLock<ScheduleInfo>>) -> Responses<NowResponse> {
 }
 
 #[get("/debug")]
-async fn get_debug_info(state: &State<RwLock<ScheduleInfo>>) -> Responses<schedule::DebugInfo> {
+async fn get_debug_info(state: &State<RwLock<Schedule>>) -> Responses<schedule::DebugInfo> {
     let mut writer = state.write().await;
     let debug_info = match (*writer).get_debug_info() {
         Ok(o) => o,
@@ -131,7 +131,7 @@ async fn get_debug_info(state: &State<RwLock<ScheduleInfo>>) -> Responses<schedu
 fn rocket() -> _ {
     main2();
     rocket::build()
-        .manage(RwLock::new(ScheduleInfo::new().unwrap()))
+        .manage(RwLock::new(Schedule::new().unwrap())) // XXX TODO Arc
         .mount("/", routes![index, time, todo, get_debug_info, now])
 }
 
@@ -140,7 +140,7 @@ fn main2() {
         Err(e) => println!("WARNING! .env NOT LOADED: {}", e),
         Ok(_) => println!("Successfully loaded .env"),
     };
-    let mut schedule = ScheduleInfo::new().unwrap();
+    let mut schedule = Schedule::new().unwrap();
     schedule.set_today().unwrap();
     println!("schedule: {schedule:#?}");
 

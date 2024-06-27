@@ -93,15 +93,16 @@ pub struct ProcessedScheduleItem {
 
 #[derive(Debug, serde::Deserialize)]
 #[serde(crate = "rocket::serde")]
-pub struct ScheduleConfig {
+pub struct ScheduleYamlConfig {
 	location: LocationConfig,
 	schedule: Vec<RawScheduleItem>,
 }
 
 #[derive(Debug)]
-pub struct ScheduleInfo {
+pub struct Schedule {
     tz: Tz,
-	pub config: ScheduleConfig,
+	location: LocationConfig,
+	pub raw_schedule: Vec<RawScheduleItem>,
 	pub todays_schedule: Option<Vec<ProcessedScheduleItem>>,
 }
 
@@ -113,7 +114,7 @@ pub struct DebugInfo {
 	processed_schedule: Vec<ProcessedScheduleItem>,
 }
 
-impl ScheduleInfo {
+impl Schedule {
 	pub fn get_debug_info(&mut self) -> anyhow::Result<DebugInfo> {
 		let updated = self.try_update()?;
 
@@ -124,7 +125,7 @@ impl ScheduleInfo {
 
 		Ok(DebugInfo {
 			updated,
-			raw_schedule: self.config.schedule.clone(),
+			raw_schedule: self.raw_schedule.clone(),
 			processed_schedule: todays_schedule
 		})
 	}
@@ -138,25 +139,26 @@ impl ScheduleInfo {
 		let schedule_file = File::open(&schedule_path)
 			.context(format!("Unable to open file at {}", &schedule_path))?;
 		let reader = BufReader::new(schedule_file);
-		let schedule_config: ScheduleConfig = serde_yaml::from_reader(reader)
+		let schedule_yaml_config: ScheduleYamlConfig = serde_yaml::from_reader(reader)
 			.context("Unable to parse schedule yaml file.")?;
-		let tz = match schedule_config.location.timezone.parse::<Tz>() {
+		let tz = match schedule_yaml_config.location.timezone.parse::<Tz>() {
 			Ok(tz) => Ok(tz),
 			Err(e) => Err(anyhow::Error::msg(format!("{e}"))),
 		}?;
-		if schedule_config.schedule.len() == 0 {
+		if schedule_yaml_config.schedule.len() == 0 {
 			return Err(anyhow::Error::msg("Schedule must have at least 1 item in it."));
 		}
 		
-		Ok(ScheduleInfo {
+		Ok(Schedule {
 			tz,
-			config: schedule_config,
+			location: schedule_yaml_config.location,
+			raw_schedule: schedule_yaml_config.schedule,
 			todays_schedule: None,
 		})
 	}
 
 	pub fn get_sunset_time(&self) -> anyhow::Result<DateTime<Tz>> {
-		match get_sunset_time(self.config.location.latitude, self.config.location.longitude, self.tz, chrono::Local::now()) {
+		match get_sunset_time(self.location.latitude, self.location.longitude, self.tz, chrono::Local::now()) {
 			Ok(time) => Ok(time),
 			Err(e) => Err(anyhow::Error::msg(format!("{e}"))),
 		}
@@ -176,7 +178,7 @@ impl ScheduleInfo {
 	pub fn set_today(&mut self) -> anyhow::Result<()> {
 		let sunset_time = self.get_sunset_time().context("Unable to get sunset time.")?;
 		println!("sunset_time: {sunset_time:?}");
-		let mut todays_schedule: Vec<ProcessedScheduleItem> = match self.config.schedule
+		let mut todays_schedule: Vec<ProcessedScheduleItem> = match self.raw_schedule
 				.iter()
 				.map(|raw_item| ProcessedScheduleItem::from(&self.tz, raw_item, &sunset_time))
 				.collect() {
