@@ -116,12 +116,6 @@ async fn now(state: &State<RwLock<ScheduleInfo>>) -> Responses<NowResponse> {
     Responses::good(NowResponse { now, change_action, just_updated: updated })
 }
 
-struct AppState {
-    // schedule_info: Option<ScheduleInfo>,
-    // asdf: String,
-    asdf: rocket::tokio::sync::RwLock<String>,
-}
-
 #[get("/debug")]
 async fn get_debug_info(state: &State<RwLock<ScheduleInfo>>) -> Responses<schedule::DebugInfo> {
     let updated = match update_if_necessary(state).await {
@@ -156,7 +150,6 @@ async fn get_schedule2(state: &State<RwLock<ScheduleInfo>>) -> String {
 fn rocket() -> _ {
     main2();
     rocket::build()
-        .manage(AppState { asdf: RwLock::new(String::from("asdf")) })
         .manage(RwLock::new(ScheduleInfo::new().unwrap()))
         .mount("/", routes![index, time, todo, get_debug_info, get_schedule2, now])
 }
