@@ -15,8 +15,8 @@ struct LocationConfig {
 	timezone: String,
 }
 
-#[derive(Debug, PartialEq, serde::Deserialize, Clone)]
-#[serde(crate = "rocket::serde", rename_all = "lowercase")]
+#[derive(Debug, PartialEq, Clone, serde::Deserialize)]
+#[serde(crate = "rocket::serde", rename_all = "snake_case")]
 enum From {
 	Sunset
 }
@@ -41,7 +41,7 @@ impl FromStr for From {
 }
 
 #[derive(Debug, PartialEq, Clone, serde::Deserialize)]
-#[serde(crate = "rocket::serde", rename_all = "lowercase")]
+#[serde(crate = "rocket::serde", rename_all = "snake_case")]
 enum Action {
 	Color,
 	Stop
@@ -233,6 +233,12 @@ impl ScheduleInfo {
 		}
 	}
 
+	pub fn get_action_for_now(&self, now: DateTime<Tz>) -> anyhow::Result<ChangeAction> {
+		let (a, b) = 
+			self.get_surrounding_schedule_items(Some(now.clone()))?;
+		self.get_action_for_time(a, b, &now)
+	}
+
 	pub fn now(&self) -> anyhow::Result<DateTime<Tz>> {
 		match tz_now(&self.tz) {
 			Some(o) => Ok(o),
@@ -246,7 +252,8 @@ where T: Into<f64>{
 	a_factor * a_value.into() + b_factor * b_value.into()
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
+#[serde(crate = "rocket::serde", rename_all = "snake_case")]
 pub enum ChangeAction {
 	None,
 	Color {mirek: u16, brightness: u8},

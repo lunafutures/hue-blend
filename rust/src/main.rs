@@ -3,8 +3,9 @@ mod sunset;
 
 #[macro_use] extern crate rocket; // XXX TODO necessary?
 
-use chrono::Local;
-use rocket::{serde::{self, json::Json}, tokio::sync::RwLock, State};
+use chrono::{DateTime, Local};
+use chrono_tz::Tz;
+use rocket::{serde::{self, json::Json}, tokio::sync::RwLock, response, State};
 
 use schedule::ScheduleInfo;
 
@@ -32,10 +33,66 @@ fn time() -> String {
     str
 }
 
+#[derive(Debug, serde::Serialize)]
+#[serde(crate = "rocket::serde", rename_all = "snake_case")]
+struct Error {
+    error: String,
+}
+
+#[derive(Responder)]
+enum Responses<T> {
+    #[response(status = 400)]
+    Bad(Json<Error>),
+    #[response(status = 200)]
+    Good(Json<T>),
+}
+
+impl<T> Responses<T> {
+    fn bad(s: String) -> Responses<T> {
+        Responses::Bad(Json(Error { error: s }))
+    }
+
+    fn good(t: T) -> Responses<T> {
+        Responses::Good(Json(t))
+    }
+}
+
+#[derive(Debug, serde::Serialize)]
+#[serde(crate = "rocket::serde", rename_all = "snake_case")]
+struct NowResponse {
+    now: DateTime<Tz>,
+    change_action: schedule::ChangeAction,
+    just_updated: bool,
+}
+
 #[get("/now")]
-async fn now(state: &State<RwLock<ScheduleInfo>>) -> String {
-    let x = state.read().await;
-    format!("{:?}", (*x).now())
+async fn now(state: &State<RwLock<ScheduleInfo>>) -> Responses<NowResponse> {
+    let should_update: bool = {
+        let reader = state.read().await;
+        (*reader).todays_schedule.is_none()
+    };
+    
+    if should_update {
+        let mut writer = state.write().await;
+        match (*writer).set_today() {
+            Ok(_) => (),
+            Err(e) => return Responses::bad(e.to_string()),
+        }
+    }
+
+    let reader = state.read().await;
+    let now = {
+        match (*reader).now() {
+            Ok(o) => o,
+            Err(e) => return Responses::bad(e.to_string()),
+        }
+    };
+    let change_action = match (*reader).get_action_for_now(now) {
+        Ok(o) => o,
+        Err(e) => return Responses::bad(e.to_string()),
+    };
+
+    Responses::good(NowResponse { now, change_action, just_updated: should_update })
 }
 
 struct AppState {
