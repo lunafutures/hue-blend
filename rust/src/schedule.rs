@@ -67,7 +67,7 @@ impl FromStr for Action {
         }
     }
 }
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, PartialEq, Clone, serde::Deserialize, serde::Serialize)]
 #[serde(crate = "rocket::serde")]
 struct ChangeItem {
 	action: Action,
@@ -84,7 +84,7 @@ pub struct RawScheduleItem {
 	change: ChangeItem,
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, PartialEq, Clone, serde::Serialize)]
 #[serde(crate = "rocket::serde")]
 pub struct ProcessedScheduleItem {
 	time: DateTime<Tz>,
@@ -248,32 +248,17 @@ impl Schedule {
 			Some(now) => now,
 			None => self.now().context("Unable to get now to find surrounding schedule items.")?,
 		};
-		let todays_schedule = self.todays_schedule.as_ref().context("todays_schedule has not been set.")?;
-		for i in 0..(todays_schedule.len() - 1) {
-			let before = todays_schedule.get(i).expect("Before too much");
-			let after = todays_schedule.get(i + 1).expect("After too much");
+		let todays_schedule = self.todays_schedule
+			.as_ref()
+			.context("todays_schedule has not been set.")?;
 
-			if before.time <= now && now < after.time {
-				return Ok((before, after))
-			}
-		}
-
-		let last_time = todays_schedule.last().context("Unable to get last element of todays_schedule")?.time;
-		if last_time < now {
-			return Err(anyhow::anyhow!("now ({now}) is later than last_time ({last_time})."))
-		}
-
-		let first_time = todays_schedule.first().context("Unable to get first element of todays_schedule")?.time;
-		if now < first_time {
-			return Err(anyhow::anyhow!("now ({now}) is later than first_time ({first_time})."))
-		}
-
-		Err(anyhow::anyhow!("now ({now}) has reached an unknown error."))
+		get_surrounding_schedule_items(todays_schedule, now)
 	}
 
 	pub fn get_action_for_now(&self, now: &DateTime<Tz>) -> anyhow::Result<ChangeAction> {
 		let (a, b) = 
 			self.get_surrounding_schedule_items(Some(now.clone()))?;
+
 		blend_actions(a, b, now)
 	}
 
@@ -323,6 +308,29 @@ pub fn blend_actions(a: &ProcessedScheduleItem, b: &ProcessedScheduleItem, now: 
 			}
 		}
 	}
+}
+
+pub fn get_surrounding_schedule_items<'a>(schedule: &'a Vec<ProcessedScheduleItem>, now: DateTime<Tz>) -> anyhow::Result<(&'a ProcessedScheduleItem, &'a ProcessedScheduleItem)> {
+	for i in 0..(schedule.len() - 1) {
+		let before = schedule.get(i).expect("Before too much");
+		let after = schedule.get(i + 1).expect("After too much");
+
+		if before.time <= now && now < after.time {
+			return Ok((before, after))
+		}
+	}
+
+	let last_time = schedule.last().context("Unable to get last element of todays_schedule")?.time;
+	if last_time < now {
+		return Err(anyhow::anyhow!("now ({now}) is later than last_time ({last_time})."))
+	}
+
+	let first_time = schedule.first().context("Unable to get first element of todays_schedule")?.time;
+	if now < first_time {
+		return Err(anyhow::anyhow!("now ({now}) is later than first_time ({first_time})."))
+	}
+
+	Err(anyhow::anyhow!("now ({now}) has reached an unknown error."))
 }
 
 pub fn fraction<T>(a_factor: f64, a_value: T, b_factor: f64, b_value: T) -> f64
@@ -388,7 +396,7 @@ fn time_to_datetime_tz<T: TimeZone>(tz: &T, hour: u8, minute: u8, date: NaiveDat
 mod tests {
     use chrono::{NaiveDateTime, TimeZone};
     use chrono_tz::{Tz, US::Eastern};
-    use super::{blend_actions, Action, ChangeItem, ProcessedScheduleItem, ChangeAction};
+    use super::{blend_actions, get_surrounding_schedule_items, Action, ChangeAction, ChangeItem, ProcessedScheduleItem};
 
 	const TEST_TZ: Tz = Eastern;
 
@@ -487,5 +495,55 @@ mod tests {
 			blend_actions(&color_10, &color_20, &get_tz_datetime(19, 30)).expect("Expected action is obtainable"),
 			ChangeAction::Color { mirek: 390, brightness: 86 },
 		);
+	}
+
+	fn create_test_schedule() -> Vec<ProcessedScheduleItem> {
+		vec![
+			create_processed_schedule_item_color(1, 0, 456, 50),
+			create_processed_schedule_item_color(10, 59, 456, 50),
+			create_processed_schedule_item_color(20, 30, 456, 50),
+		]
+	}
+
+	#[test]
+	fn test_surrounding_within() {
+		let schedule = create_test_schedule();
+		assert_eq!(
+			get_surrounding_schedule_items(&schedule, get_tz_datetime(1, 0))
+				.expect("Expect to get surrounding schedule items."),
+			(&schedule[0], &schedule[1])
+		);
+
+		assert_eq!(
+			get_surrounding_schedule_items(&schedule, get_tz_datetime(9, 0))
+				.expect("Expect to get surrounding schedule items."),
+			(&schedule[0], &schedule[1])
+		);
+
+		assert_eq!(
+			get_surrounding_schedule_items(&schedule, get_tz_datetime(10, 0))
+				.expect("Expect to get surrounding schedule items."),
+			(&schedule[0], &schedule[1])
+		);
+
+		assert_eq!(
+			get_surrounding_schedule_items(&schedule, get_tz_datetime(11, 0))
+				.expect("Expect to get surrounding schedule items."),
+			(&schedule[1], &schedule[2])
+		);
+
+		assert_eq!(
+			get_surrounding_schedule_items(&schedule, get_tz_datetime(20, 29))
+				.expect("Expect to get surrounding schedule items."),
+			(&schedule[1], &schedule[2])
+		);
+	}
+
+	#[test]
+	fn test_surrounding_outside() {
+		let schedule = create_test_schedule();
+		assert!(get_surrounding_schedule_items(&schedule, get_tz_datetime(0, 0)).is_err());
+		assert!(get_surrounding_schedule_items(&schedule, get_tz_datetime(20, 30)).is_err());
+		assert!(get_surrounding_schedule_items(&schedule, get_tz_datetime(20, 31)).is_err());
 	}
 }
