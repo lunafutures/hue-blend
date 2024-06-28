@@ -1,0 +1,10 @@
+version: '3.8'
+services:
+  rust:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      SCHEDULE_YAML_PATH: "/config/schedule.yml"
+    volumes:
+      - ./private/schedule.yml:/config/schedule.yml
