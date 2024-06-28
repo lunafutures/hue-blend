@@ -67,6 +67,7 @@ impl FromStr for Action {
         }
     }
 }
+
 #[derive(Debug, PartialEq, Clone, serde::Deserialize, serde::Serialize)]
 #[serde(crate = "rocket::serde")]
 struct ChangeItem {
@@ -126,6 +127,11 @@ pub struct DebugInfo {
 	change_action: ChangeAction,
 }
 
+fn get_file_modification_time(path: &str) -> anyhow::Result<std::time::SystemTime> {
+    let metadata = std::fs::metadata(path)?;
+	Ok(metadata.modified()?)
+}
+
 impl Schedule {
 	pub fn get_debug_info(&mut self) -> anyhow::Result<DebugInfo> {
 		let updated = self.try_update()?;
@@ -162,6 +168,7 @@ impl Schedule {
 			.context(format!("Unable to find env var: {env_path_var}"))?;
 		let schedule_file = File::open(&yaml_path)
 			.context(format!("Unable to open file at {}", &yaml_path))?;
+		println!("File modified: {:?}", get_file_modification_time(&yaml_path).unwrap()); // XXX
 		let reader = BufReader::new(schedule_file);
 		let schedule_yaml_config: ScheduleYamlConfig = serde_yaml::from_reader(reader)
 			.context("Unable to parse schedule yaml file.")?;
