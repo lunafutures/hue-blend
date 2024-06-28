@@ -118,7 +118,7 @@ struct DebugSurrounding {
 #[derive(Debug, serde::Serialize)]
 #[serde(crate = "rocket::serde")]
 pub struct DebugInfo {
-	updated: bool,
+	just_updated: bool,
 	tz: String,
     raw_schedule: Vec<RawScheduleItem>,
 	processed_schedule: Vec<ProcessedScheduleItem>,
@@ -134,7 +134,7 @@ fn get_file_modification_time(path: &str) -> anyhow::Result<std::time::SystemTim
 
 impl Schedule {
 	pub fn get_debug_info(&mut self) -> anyhow::Result<DebugInfo> {
-		let updated = self.try_update()?;
+		let just_updated = self.try_update()?;
 
 		let todays_schedule = match self.todays_schedule.clone() {
 			Some(s) => s,
@@ -150,7 +150,7 @@ impl Schedule {
 
 		Ok(DebugInfo {
 			tz: self.tz.to_string(),
-			updated,
+			just_updated,
 			raw_schedule: self.raw_schedule.clone(),
 			processed_schedule: todays_schedule,
 			now,

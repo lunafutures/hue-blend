@@ -5,7 +5,7 @@ mod sunset;
 
 use chrono::DateTime;
 use chrono_tz::Tz;
-use rocket::{serde::{self, json::Json}, tokio::sync::RwLock, State};
+use rocket::{serde::{self, json::Json}, tokio::sync::Mutex, State};
 
 use schedule::Schedule;
 
@@ -46,33 +46,16 @@ struct NowResponse {
     just_updated: bool,
 }
 
-async fn update_if_necessary(state: &State<RwLock<Schedule>>) -> anyhow::Result<bool> {
-    let should_update: bool = {
-        let reader = state.read().await;
-        (*reader).todays_schedule.is_none()
-    };
-    
-    if should_update {
-        let mut writer = state.write().await;
-        match (*writer).set_today() {
-            Ok(_) => Ok(true),
-            Err(e) => Err(e),
-        }
-    } else {
-        Ok(false)
-    }
-}
-
 #[get("/now")]
-async fn now(state: &State<RwLock<Schedule>>) -> Responses<NowResponse> {
-    let updated = match update_if_necessary(state).await {
+async fn now(state: &State<Mutex<Schedule>>) -> Responses<NowResponse> {
+    let mut guard = state.lock().await;
+    let updated = match (*guard).try_update() {
         Ok(o) => o,
-        Err(e) => return Responses::bad(e.to_string()),
+        Err(e) => return Responses::bad(e.to_string())
     };
 
-    let reader = state.read().await;
-    let now = (*reader).now();
-    let change_action = match (*reader).get_action_for_now(&now) {
+    let now = (*guard).now();
+    let change_action = match (*guard).get_action_for_now(&now) {
         Ok(o) => o,
         Err(e) => return Responses::bad(e.to_string()),
     };
@@ -81,9 +64,11 @@ async fn now(state: &State<RwLock<Schedule>>) -> Responses<NowResponse> {
 }
 
 #[get("/debug")]
-async fn get_debug_info(state: &State<RwLock<Schedule>>) -> Responses<schedule::DebugInfo> {
-    let mut writer = state.write().await;
-    let debug_info = match (*writer).get_debug_info() {
+async fn get_debug_info(state: &State<Mutex<Schedule>>) -> Responses<schedule::DebugInfo> {
+    let mut guard = state.lock().await;
+
+    // get_debug_info() will automatically update
+    let debug_info = match (*guard).get_debug_info() {
         Ok(o) => o,
         Err(e) => return Responses::bad(e.to_string()),
     };
@@ -102,6 +87,6 @@ fn rocket() -> _ {
     }
 
     rocket::build()
-        .manage(RwLock::new(Schedule::new().unwrap())) // XXX TODO Arc
+        .manage(Mutex::new(Schedule::new().unwrap())) // XXX TODO Arc
         .mount("/", routes![index, get_debug_info, now])
 }
