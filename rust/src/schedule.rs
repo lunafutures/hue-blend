@@ -139,7 +139,7 @@ impl Schedule {
 			let (first, last) = self.get_surrounding_schedule_items(Some(now))?;
 			DebugSurrounding { first: first.clone(), last: last.clone() }
 		};
-		let change_action = self.get_action_for_now(now)?;
+		let change_action = self.get_action_for_now(&now)?;
 
 		Ok(DebugInfo {
 			tz: self.tz.to_string(),
@@ -271,42 +271,10 @@ impl Schedule {
 		Err(anyhow::anyhow!("now ({now}) has reached an unknown error."))
 	}
 
-	pub fn get_action_for_time(&self, a: &ProcessedScheduleItem, b: &ProcessedScheduleItem, now: &DateTime<Tz>) -> anyhow::Result<ChangeAction> {
-		match a.change.action {
-			Action::Stop => Ok(ChangeAction::None),
-			Action::Color => match b.change.action {
-				Action::Stop => {
-					let mirek = a.change.mirek.context(format!("Expected mirek in change: {:#?}", a.change))?;
-					let brightness = a.change.brightness.context(format!("Expected brightness in change: {:#?}", a.change))?;
-					Ok(ChangeAction::Color { mirek, brightness })
-				},
-				Action::Color => {
-					let a_factor: f64 = (b.time - now).num_milliseconds() as f64 / (b.time - a.time).num_milliseconds() as f64;
-					let b_factor: f64 = 1.0 - a_factor;
-
-					let a_mirek = a.change.mirek.context(format!("Expected mirek in change: {:#?}", a.change))?;
-					let a_brightness = a.change.brightness.context(format!("Expected brightness in change: {:#?}", a.change))?;
-
-					let b_mirek = b.change.mirek.context(format!("Expected mirek in change: {:#?}", b.change))?;
-					let b_brightness = b.change.brightness.context(format!("Expected brightness in change: {:#?}", b.change))?;
-
-					Ok(ChangeAction::Color { 
-						mirek: fraction(
-							a_factor, a_mirek,
-							b_factor, b_mirek) as u16,
-						brightness: fraction(
-							a_factor, a_brightness,
-							b_factor, b_brightness) as u8,
-					})
-				}
-			}
-		}
-	}
-
-	pub fn get_action_for_now(&self, now: DateTime<Tz>) -> anyhow::Result<ChangeAction> {
+	pub fn get_action_for_now(&self, now: &DateTime<Tz>) -> anyhow::Result<ChangeAction> {
 		let (a, b) = 
 			self.get_surrounding_schedule_items(Some(now.clone()))?;
-		self.get_action_for_time(a, b, &now)
+		blend_actions(a, b, now)
 	}
 
 	pub fn now(&self) -> anyhow::Result<DateTime<Tz>> {
@@ -317,19 +285,59 @@ impl Schedule {
 	}
 }
 
+pub fn blend_actions(a: &ProcessedScheduleItem, b: &ProcessedScheduleItem, now: &DateTime<Tz>) -> anyhow::Result<ChangeAction> {
+	if a.time > b.time {
+		return Err(anyhow::anyhow!("a.time ({a:?}) should not be after b.time ({b:?})"));
+	} else if now < &a.time {
+		return Err(anyhow::anyhow!("now ({now}) should not be after a.time ({a:?})"));
+	} else if &b.time < now {
+		return Err(anyhow::anyhow!("b.time ({b:?}) should not be after now ({now})"));
+	}
+
+	match a.change.action {
+		Action::Stop => Ok(ChangeAction::None),
+		Action::Color => match b.change.action {
+			Action::Stop => {
+				let mirek = a.change.mirek.context(format!("Expected mirek in change: {:#?}", a.change))?;
+				let brightness = a.change.brightness.context(format!("Expected brightness in change: {:#?}", a.change))?;
+				Ok(ChangeAction::Color { mirek, brightness })
+			},
+			Action::Color => {
+				let a_factor: f64 = (b.time - now).num_milliseconds() as f64 / (b.time - a.time).num_milliseconds() as f64;
+				let b_factor: f64 = 1.0 - a_factor;
+
+				let a_mirek = a.change.mirek.context(format!("Expected mirek in change: {:#?}", a.change))?;
+				let a_brightness = a.change.brightness.context(format!("Expected brightness in change: {:#?}", a.change))?;
+
+				let b_mirek = b.change.mirek.context(format!("Expected mirek in change: {:#?}", b.change))?;
+				let b_brightness = b.change.brightness.context(format!("Expected brightness in change: {:#?}", b.change))?;
+
+				Ok(ChangeAction::Color { 
+					mirek: fraction(
+						a_factor, a_mirek,
+						b_factor, b_mirek) as u16,
+					brightness: fraction(
+						a_factor, a_brightness,
+						b_factor, b_brightness) as u8,
+				})
+			}
+		}
+	}
+}
+
 pub fn fraction<T>(a_factor: f64, a_value: T, b_factor: f64, b_value: T) -> f64
 where T: Into<f64>{
 	a_factor * a_value.into() + b_factor * b_value.into()
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, PartialEq, serde::Serialize)]
 #[serde(crate = "rocket::serde", rename_all = "snake_case")]
 pub enum ChangeAction {
 	None,
 	Color {mirek: u16, brightness: u8},
 }
 
-impl ProcessedScheduleItem {
+impl ProcessedScheduleItem { // XXX TODO move closer to definition
 	pub fn from(tz: &Tz, raw: &RawScheduleItem, sunset_time: &DateTime<Tz>) -> anyhow::Result<Self> {
 		let hour = raw.hour.unwrap_or(0);
 		let minute = raw.minute.unwrap_or(0);
@@ -352,6 +360,7 @@ impl ProcessedScheduleItem {
 	}
 }
 
+// XXX TODO: move fns to time.rs
 pub fn tz_now<T: TimeZone>(tz: &T) -> Option<DateTime<T>> {
 	let now = chrono::Local::now().naive_local();
 	tz.from_local_datetime(&now).earliest()
@@ -372,5 +381,111 @@ fn time_to_datetime_tz<T: TimeZone>(tz: &T, hour: u8, minute: u8, date: NaiveDat
 	match tz.from_local_datetime(&naive_datetime).earliest() {
 		Some(t) => Ok(t),
 		None => Err(anyhow::anyhow!("Could not convert local ({naive_datetime}) to tz datetime.")),
+	}
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::{NaiveDateTime, TimeZone};
+    use chrono_tz::{Tz, US::Eastern};
+    use super::{blend_actions, Action, ChangeItem, ProcessedScheduleItem, ChangeAction};
+
+	const TEST_TZ: Tz = Eastern;
+
+	fn get_naive_datetime(hour: u32, minute: u32) -> NaiveDateTime {
+		chrono::NaiveDate::from_ymd_opt(1999, 1, 1)
+			.unwrap()
+			.and_time(chrono::NaiveTime::from_hms_opt(hour, minute, 0).unwrap())
+	}
+
+	fn get_tz_datetime(hour: u32, minute: u32) -> chrono::DateTime<Tz> {
+		TEST_TZ.from_local_datetime(&get_naive_datetime(hour, minute))
+			.earliest()
+			.unwrap()
+	}
+
+	fn create_processed_schedule_item_color(hour: u32, minute: u32, mirek: u16, brightness: u8) -> ProcessedScheduleItem {
+		ProcessedScheduleItem {
+			time: get_tz_datetime(hour, minute),
+			change: ChangeItem {
+				action: Action::Color,
+				mirek: Some(mirek),
+				brightness: Some(brightness),
+			},
+		}
+	}
+
+	fn create_processed_schedule_item_stop(hour: u32, minute: u32) -> ProcessedScheduleItem {
+		ProcessedScheduleItem {
+			time: get_tz_datetime(hour, minute),
+			change: ChangeItem {
+				action: Action::Stop,
+				mirek: None,
+				brightness: None,
+			},
+		}
+	}
+
+    #[test]
+    fn test_blend_action_stop_before() {
+		let stop_12 = create_processed_schedule_item_stop(12, 0);
+		let color_13 = create_processed_schedule_item_color(13, 0, 123, 50);
+
+		assert_eq!(
+			blend_actions(&stop_12, &color_13, &get_tz_datetime(12, 0)).expect("Expected action is obtainable"),
+			ChangeAction::None,
+		);
+
+		assert_eq!(
+			blend_actions(&stop_12, &color_13, &get_tz_datetime(12, 59)).expect("Expected action is obtainable"),
+			ChangeAction::None,
+		);
+    }
+
+    #[test]
+	fn test_blend_action_stop_after() {
+		let color_10 = create_processed_schedule_item_color(10, 0, 123, 50);
+		let stop_12 = create_processed_schedule_item_stop(12, 0);
+
+		assert_eq!(
+			blend_actions(&color_10, &stop_12, &get_tz_datetime(10, 0)).expect("Expected action is obtainable"),
+			ChangeAction::Color { mirek: 123, brightness: 50 },
+		);
+
+		assert_eq!(
+			blend_actions(&color_10, &stop_12, &get_tz_datetime(11, 30)).expect("Expected action is obtainable"),
+			ChangeAction::Color { mirek: 123, brightness: 50 },
+		);
+	}
+
+	#[test]
+	fn test_blend_action_invalid() {
+		let color_10 = create_processed_schedule_item_color(10, 0, 123, 50);
+		let stop_12 = create_processed_schedule_item_stop(12, 0);
+
+		assert!(blend_actions(&color_10, &stop_12, &get_tz_datetime(9, 59)).is_err());
+		assert!(blend_actions(&color_10, &stop_12, &get_tz_datetime(12, 1)).is_err());
+		assert!(blend_actions(&stop_12, &color_10, &get_tz_datetime(11, 0)).is_err());
+	}
+
+	#[test]
+	fn test_blend_action_2_colors() {
+		let color_10 = create_processed_schedule_item_color(10, 0, 200, 10);
+		let color_20 = create_processed_schedule_item_color(20, 0, 400, 90);
+
+		assert_eq!(
+			blend_actions(&color_10, &color_20, &get_tz_datetime(10, 0)).expect("Expected action is obtainable"),
+			ChangeAction::Color { mirek: 200, brightness: 10 },
+		);
+
+		assert_eq!(
+			blend_actions(&color_10, &color_20, &get_tz_datetime(15, 0)).expect("Expected action is obtainable"),
+			ChangeAction::Color { mirek: 300, brightness: 50 },
+		);
+
+		assert_eq!(
+			blend_actions(&color_10, &color_20, &get_tz_datetime(19, 30)).expect("Expected action is obtainable"),
+			ChangeAction::Color { mirek: 390, brightness: 86 },
+		);
 	}
 }

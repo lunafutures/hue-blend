@@ -108,7 +108,7 @@ async fn now(state: &State<RwLock<Schedule>>) -> Responses<NowResponse> {
             Err(e) => return Responses::bad(e.to_string()),
         }
     };
-    let change_action = match (*reader).get_action_for_now(now) {
+    let change_action = match (*reader).get_action_for_now(&now) {
         Ok(o) => o,
         Err(e) => return Responses::bad(e.to_string()),
     };
@@ -127,15 +127,15 @@ async fn get_debug_info(state: &State<RwLock<Schedule>>) -> Responses<schedule::
     Responses::good(debug_info)
 }
 
-#[launch]
-fn rocket() -> _ {
-    main2();
-    rocket::build()
-        .manage(RwLock::new(Schedule::new().unwrap())) // XXX TODO Arc
-        .mount("/", routes![index, time, todo, get_debug_info, now])
-}
+// #[launch]
+// fn rocket() -> _ {
+//     main2();
+//     rocket::build()
+//         .manage(RwLock::new(Schedule::new().unwrap())) // XXX TODO Arc
+//         .mount("/", routes![index, time, todo, get_debug_info, now])
+// }
 
-fn main2() {
+fn main() {
     match dotenvy::dotenv() {
         Err(e) => println!("WARNING! .env NOT LOADED: {}", e),
         Ok(_) => println!("Successfully loaded .env"),
@@ -148,6 +148,6 @@ fn main2() {
     let (a, b) = schedule.get_surrounding_schedule_items(Some(now.clone())).unwrap();
     println!("a: {a:#?}\nb: {b:#?}");
 
-    let action = schedule.get_action_for_time(a, b, &now).unwrap();
+    let action = schedule.get_action_for_now(&now).unwrap();
     println!("action: {action:#?}");
 }
