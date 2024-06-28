@@ -122,19 +122,19 @@ async fn get_debug_info(state: &State<RwLock<Schedule>>) -> Responses<schedule::
     Responses::good(debug_info)
 }
 
-// #[launch]
-// fn rocket() -> _ {
-//     main2();
-//     rocket::build()
-//         .manage(RwLock::new(Schedule::new().unwrap())) // XXX TODO Arc
-//         .mount("/", routes![index, time, todo, get_debug_info, now])
-// }
-
-fn main() {
+#[launch]
+fn rocket() -> _ {
     match dotenvy::dotenv() {
         Err(e) => println!("WARNING! .env NOT LOADED: {}", e),
         Ok(_) => println!("Successfully loaded .env"),
     };
+    // main2();
+    rocket::build()
+        .manage(RwLock::new(Schedule::new().unwrap())) // XXX TODO Arc
+        .mount("/", routes![index, time, todo, get_debug_info, now])
+}
+
+fn main2() {
     let mut schedule = Schedule::new().unwrap();
     schedule.set_today().unwrap();
     println!("schedule: {schedule:#?}");
