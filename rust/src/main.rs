@@ -3,6 +3,8 @@ mod sunset;
 
 #[macro_use] extern crate rocket; // XXX TODO necessary?
 
+use std::sync::Arc;
+
 use chrono::DateTime;
 use chrono_tz::Tz;
 use rocket::{serde::{self, json::Json}, tokio::sync::Mutex, State};
@@ -47,7 +49,7 @@ struct NowResponse {
 }
 
 #[get("/now")]
-async fn now(state: &State<Mutex<Schedule>>) -> Responses<NowResponse> {
+async fn now(state: &State<Arc<Mutex<Schedule>>>) -> Responses<NowResponse> {
     let mut guard = state.lock().await;
     let updated = match (*guard).try_update() {
         Ok(o) => o,
@@ -64,7 +66,7 @@ async fn now(state: &State<Mutex<Schedule>>) -> Responses<NowResponse> {
 }
 
 #[get("/debug")]
-async fn get_debug_info(state: &State<Mutex<Schedule>>) -> Responses<schedule::DebugInfo> {
+async fn get_debug_info(state: &State<Arc<Mutex<Schedule>>>) -> Responses<schedule::DebugInfo> {
     let mut guard = state.lock().await;
 
     // get_debug_info() will automatically update
@@ -78,8 +80,9 @@ async fn get_debug_info(state: &State<Mutex<Schedule>>) -> Responses<schedule::D
 
 #[launch]
 fn rocket() -> _ {
-    #[cfg(debug_assertions)]
+    #[cfg(debug_assertions)] 
     {
+        // Only read .env in non-release mode
         match dotenvy::dotenv() {
             Err(e) => println!("WARNING! .env NOT LOADED: {}", e),
             Ok(_) => println!("Successfully loaded .env"),
@@ -87,6 +90,6 @@ fn rocket() -> _ {
     }
 
     rocket::build()
-        .manage(Mutex::new(Schedule::new().unwrap())) // XXX TODO Arc
+        .manage(Arc::new(Mutex::new(Schedule::new().unwrap())))
         .mount("/", routes![index, get_debug_info, now])
 }
