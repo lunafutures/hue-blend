@@ -135,7 +135,7 @@ impl Schedule {
 			None => return Err(anyhow::anyhow!("todays_schedule is unexpected None")),
 		};
 
-		let now = self.now()?;
+		let now = self.now();
 		let surrounding_items = {
 			let (first, last) = self.get_surrounding_schedule_items(Some(now))?;
 			DebugSurrounding { first: first.clone(), last: last.clone() }
@@ -246,9 +246,9 @@ impl Schedule {
 	}
 
 	pub fn get_surrounding_schedule_items(&self, now: Option<DateTime<Tz>>) -> anyhow::Result<(&ProcessedScheduleItem, &ProcessedScheduleItem)> {
-		let now : DateTime<Tz> = match now {
+		let now : DateTime<Tz> = match now { // XXX todo: should now be able to be passed in or computed?
 			Some(now) => now,
-			None => self.now().context("Unable to get now to find surrounding schedule items.")?,
+			None => self.now()
 		};
 		let todays_schedule = self.todays_schedule
 			.as_ref()
@@ -264,11 +264,8 @@ impl Schedule {
 		blend_actions(a, b, now)
 	}
 
-	pub fn now(&self) -> anyhow::Result<DateTime<Tz>> {
-		match tz_now(&self.tz) {
-			Some(o) => Ok(o),
-			None => Err(anyhow::anyhow!("Unable to construct now for timezone: {}", &self.tz)),
-		}
+	pub fn now(&self) -> DateTime<Tz> {
+		tz_now(&self.tz)
 	}
 }
 
@@ -371,9 +368,9 @@ impl ProcessedScheduleItem { // XXX TODO move closer to definition
 }
 
 // XXX TODO: move fns to time.rs
-pub fn tz_now<T: TimeZone>(tz: &T) -> Option<DateTime<T>> {
-	let now = chrono::Local::now().naive_local();
-	tz.from_local_datetime(&now).earliest()
+pub fn tz_now<T: TimeZone>(tz: &T) -> DateTime<T> {
+	let now = chrono::Utc::now().naive_local();
+	tz.from_utc_datetime(&now)
 }
 
 pub fn time_to_today_tz<T: TimeZone>(tz: &T, today: NaiveDate, hour: u8, minute: u8) -> anyhow::Result<DateTime<T>> {

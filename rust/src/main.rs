@@ -102,12 +102,7 @@ async fn now(state: &State<RwLock<Schedule>>) -> Responses<NowResponse> {
     // }
 
     let reader = state.read().await;
-    let now = {
-        match (*reader).now() {
-            Ok(o) => o,
-            Err(e) => return Responses::bad(e.to_string()),
-        }
-    };
+    let now = (*reader).now();
     let change_action = match (*reader).get_action_for_now(&now) {
         Ok(o) => o,
         Err(e) => return Responses::bad(e.to_string()),
@@ -144,7 +139,8 @@ fn main() {
     schedule.set_today().unwrap();
     println!("schedule: {schedule:#?}");
 
-    let now = schedule.now().unwrap();
+    let now = schedule.now();
+    println!("now: {now}");
     let (a, b) = schedule.get_surrounding_schedule_items(Some(now.clone())).unwrap();
     println!("a: {a:#?}\nb: {b:#?}");
 
