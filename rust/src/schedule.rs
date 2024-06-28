@@ -100,6 +100,7 @@ pub struct ScheduleYamlConfig {
 
 #[derive(Debug)]
 pub struct Schedule {
+	yaml_path: String,
     tz: Tz,
 	location: LocationConfig,
 	pub raw_schedule: Vec<RawScheduleItem>,
@@ -157,10 +158,10 @@ impl Schedule {
 	}
 
 	pub fn from_env(env_path_var: &str) -> anyhow::Result<Self> {
-		let schedule_path = env::var(env_path_var)
+		let yaml_path = env::var(env_path_var)
 			.context(format!("Unable to find env var: {env_path_var}"))?;
-		let schedule_file = File::open(&schedule_path)
-			.context(format!("Unable to open file at {}", &schedule_path))?;
+		let schedule_file = File::open(&yaml_path)
+			.context(format!("Unable to open file at {}", &yaml_path))?;
 		let reader = BufReader::new(schedule_file);
 		let schedule_yaml_config: ScheduleYamlConfig = serde_yaml::from_reader(reader)
 			.context("Unable to parse schedule yaml file.")?;
@@ -173,6 +174,7 @@ impl Schedule {
 		}
 		
 		Ok(Schedule {
+			yaml_path,
 			tz,
 			location: schedule_yaml_config.location,
 			raw_schedule: schedule_yaml_config.schedule,
