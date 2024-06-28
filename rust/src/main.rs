@@ -11,28 +11,36 @@ use rocket::{serde::{self, json::Json}, tokio::sync::Mutex, State};
 
 use schedule::Schedule;
 
-#[get("/")] // XXX remove
-fn index() -> &'static str {
-    "Hello, world!"
+#[derive(Debug, serde::Serialize)]
+#[serde(crate = "rocket::serde", rename_all = "snake_case")]
+struct StatusBody {
+    up: bool,
+}
+
+#[get("/")]
+fn index() -> Json<StatusBody> {
+    Json(StatusBody {
+        up: true,
+    })
 }
 
 #[derive(Debug, serde::Serialize)]
 #[serde(crate = "rocket::serde", rename_all = "snake_case")]
-struct ErrorResponse {
+struct ErrorBody {
     error: String,
 }
 
 #[derive(Responder)]
 enum Responses<T> {
     #[response(status = 400)]
-    Bad(Json<ErrorResponse>),
+    Bad(Json<ErrorBody>),
     #[response(status = 200)]
     Good(Json<T>),
 }
 
 impl<T> Responses<T> {
     fn bad(s: String) -> Responses<T> {
-        Responses::Bad(Json(ErrorResponse { error: s }))
+        Responses::Bad(Json(ErrorBody { error: s }))
     }
 
     fn good(t: T) -> Responses<T> {
