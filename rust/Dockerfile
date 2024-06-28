@@ -9,4 +9,5 @@ RUN cargo build --release
 FROM ubuntu:latest
 EXPOSE 8000
 COPY --from=builder /usr/src/app/target/release/rust-hue /usr/local/bin/rust-hue
+COPY Rocket.toml .
 CMD ["rust-hue"]
