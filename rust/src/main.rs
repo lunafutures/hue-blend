@@ -3,7 +3,7 @@ mod sunset;
 
 #[macro_use] extern crate rocket; // XXX TODO necessary?
 
-use chrono::{DateTime, Local};
+use chrono::DateTime;
 use chrono_tz::Tz;
 use rocket::{serde::{self, json::Json}, tokio::sync::RwLock, State};
 
@@ -14,42 +14,23 @@ fn index() -> &'static str {
     "Hello, world!"
 }
 
-#[derive(serde::Serialize)]
-#[serde(crate = "rocket::serde")]
-struct Task {
-    dog: String,
-}
-
-#[get("/todo")] // XXX remove
-fn todo() -> Json<Task> {
-    Json(Task { dog: String::from("woof") })
-}
-
-#[get("/time")] // XXX remove
-fn time() -> String {
-    let now = Local::now();
-    let str = format!("now is {}", now.format("%Y-%m-%d %H:%M:%S"));
-    println!("{}", &str);
-    str
-}
-
 #[derive(Debug, serde::Serialize)]
 #[serde(crate = "rocket::serde", rename_all = "snake_case")]
-struct Error {
+struct ErrorResponse {
     error: String,
 }
 
 #[derive(Responder)]
 enum Responses<T> {
     #[response(status = 400)]
-    Bad(Json<Error>),
+    Bad(Json<ErrorResponse>),
     #[response(status = 200)]
     Good(Json<T>),
 }
 
 impl<T> Responses<T> {
     fn bad(s: String) -> Responses<T> {
-        Responses::Bad(Json(Error { error: s }))
+        Responses::Bad(Json(ErrorResponse { error: s }))
     }
 
     fn good(t: T) -> Responses<T> {
@@ -88,18 +69,6 @@ async fn now(state: &State<RwLock<Schedule>>) -> Responses<NowResponse> {
         Ok(o) => o,
         Err(e) => return Responses::bad(e.to_string()),
     };
-    // let should_update: bool = {
-    //     let reader = state.read().await;
-    //     (*reader).todays_schedule.is_none()
-    // };
-    
-    // if should_update {
-    //     let mut writer = state.write().await;
-    //     match (*writer).set_today() {
-    //         Ok(_) => (),
-    //         Err(e) => return Responses::bad(e.to_string()),
-    //     }
-    // }
 
     let reader = state.read().await;
     let now = (*reader).now();
@@ -124,26 +93,15 @@ async fn get_debug_info(state: &State<RwLock<Schedule>>) -> Responses<schedule::
 
 #[launch]
 fn rocket() -> _ {
-    match dotenvy::dotenv() {
-        Err(e) => println!("WARNING! .env NOT LOADED: {}", e),
-        Ok(_) => println!("Successfully loaded .env"),
-    };
-    // main2();
+    #[cfg(debug_assertions)]
+    {
+        match dotenvy::dotenv() {
+            Err(e) => println!("WARNING! .env NOT LOADED: {}", e),
+            Ok(_) => println!("Successfully loaded .env"),
+        };
+    }
+
     rocket::build()
         .manage(RwLock::new(Schedule::new().unwrap())) // XXX TODO Arc
-        .mount("/", routes![index, time, todo, get_debug_info, now])
-}
-
-fn main2() {
-    let mut schedule = Schedule::new().unwrap();
-    schedule.set_today().unwrap();
-    println!("schedule: {schedule:#?}");
-
-    let now = schedule.now();
-    println!("now: {now}");
-    let (a, b) = schedule.get_surrounding_schedule_items(Some(now.clone())).unwrap();
-    println!("a: {a:#?}\nb: {b:#?}");
-
-    let action = schedule.get_action_for_now(&now).unwrap();
-    println!("action: {action:#?}");
+        .mount("/", routes![index, get_debug_info, now])
 }
