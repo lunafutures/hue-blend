@@ -1,7 +1,7 @@
 mod schedule;
 mod sunset;
 
-#[macro_use] extern crate rocket; // XXX TODO necessary?
+#[macro_use] extern crate rocket;
 
 use std::sync::Arc;
 
@@ -59,12 +59,12 @@ struct NowResponse {
 #[get("/now")]
 async fn now(state: &State<Arc<Mutex<Schedule>>>) -> Responses<NowResponse> {
     let mut guard = state.lock().await;
-    let updated = match (*guard).try_update() {
+    let now = (*guard).now();
+    let updated = match (*guard).try_update(now) {
         Ok(o) => o,
         Err(e) => return Responses::bad(e.to_string())
     };
 
-    let now = (*guard).now();
     let change_action = match (*guard).get_action_for_now(&now) {
         Ok(o) => o,
         Err(e) => return Responses::bad(e.to_string()),
@@ -86,6 +86,22 @@ async fn get_debug_info(state: &State<Arc<Mutex<Schedule>>>) -> Responses<schedu
     Responses::good(debug_info)
 }
 
+#[derive(Debug, serde::Serialize)]
+#[serde(crate = "rocket::serde", rename_all = "snake_case")]
+struct ForceUpdateBody {
+    just_updated: bool,
+}
+
+#[put("/force-update")]
+async fn force_update(state: &State<Arc<Mutex<Schedule>>>) -> Responses<ForceUpdateBody> {
+    let mut guard = state.lock().await;
+    if let Err(e) = (*guard).set_today() {
+        return Responses::bad(e.to_string())
+    }
+
+    Responses::good(ForceUpdateBody { just_updated: true })
+}
+
 #[launch]
 fn rocket() -> _ {
     #[cfg(debug_assertions)] 
@@ -99,5 +115,5 @@ fn rocket() -> _ {
 
     rocket::build()
         .manage(Arc::new(Mutex::new(Schedule::new().unwrap())))
-        .mount("/", routes![index, get_debug_info, now])
+        .mount("/", routes![index, get_debug_info, now, force_update])
 }

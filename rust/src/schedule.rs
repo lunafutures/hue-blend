@@ -134,16 +134,16 @@ fn get_file_modification_time(path: &str) -> anyhow::Result<std::time::SystemTim
 
 impl Schedule {
 	pub fn get_debug_info(&mut self) -> anyhow::Result<DebugInfo> {
-		let just_updated = self.try_update()?;
+		let now = self.now();
+		let just_updated = self.try_update(now)?;
 
 		let todays_schedule = match self.todays_schedule.clone() {
 			Some(s) => s,
 			None => return Err(anyhow::anyhow!("todays_schedule is unexpected None")),
 		};
 
-		let now = self.now();
 		let surrounding_items = {
-			let (first, last) = self.get_surrounding_schedule_items(Some(now))?;
+			let (first, last) = self.get_surrounding_schedule_items(now)?;
 			DebugSurrounding { first: first.clone(), last: last.clone() }
 		};
 		let change_action = self.get_action_for_now(&now)?;
@@ -196,12 +196,22 @@ impl Schedule {
 		}
 	}
 
-	pub fn try_update(&mut self) -> anyhow::Result<bool> {
+	pub fn try_update(&mut self, now: DateTime<Tz>) -> anyhow::Result<bool> {
 		let updated = if self.todays_schedule.is_none() {
 			self.set_today()?;
 			true
 		} else {
-			false
+			let latest = match self.latest_scheduled_time() {
+				Some(s) => s,
+				None => return Err(anyhow::anyhow!("Should have a latest scheduled time after update.")),
+			};
+
+			if latest < now {
+				self.set_today()?;
+				true
+			} else {
+				false
+			}
 		};
 
 		Ok(updated)
@@ -252,11 +262,7 @@ impl Schedule {
 		}
 	}
 
-	pub fn get_surrounding_schedule_items(&self, now: Option<DateTime<Tz>>) -> anyhow::Result<(&ProcessedScheduleItem, &ProcessedScheduleItem)> {
-		let now : DateTime<Tz> = match now { // XXX todo: should now be able to be passed in or computed?
-			Some(now) => now,
-			None => self.now()
-		};
+	pub fn get_surrounding_schedule_items(&self, now: DateTime<Tz>) -> anyhow::Result<(&ProcessedScheduleItem, &ProcessedScheduleItem)> {
 		let todays_schedule = self.todays_schedule
 			.as_ref()
 			.context("todays_schedule has not been set.")?;
@@ -266,7 +272,7 @@ impl Schedule {
 
 	pub fn get_action_for_now(&self, now: &DateTime<Tz>) -> anyhow::Result<ChangeAction> {
 		let (a, b) = 
-			self.get_surrounding_schedule_items(Some(now.clone()))?;
+			self.get_surrounding_schedule_items(now.clone())?;
 
 		blend_actions(a, b, now)
 	}
