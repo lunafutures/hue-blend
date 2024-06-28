@@ -200,10 +200,10 @@ impl Schedule {
 
 	pub fn set_today(&mut self) -> anyhow::Result<()> {
 		let sunset_time = self.get_sunset_time().context("Unable to get sunset time.")?;
-		println!("sunset_time: {sunset_time:?}");
+		let today = chrono::Local::now().naive_local().date();
 		let mut todays_schedule: Vec<ProcessedScheduleItem> = match self.raw_schedule
 				.iter()
-				.map(|raw_item| ProcessedScheduleItem::from(&self.tz, raw_item, &sunset_time))
+				.map(|raw_item| ProcessedScheduleItem::from(&self.tz, raw_item, today, &sunset_time))
 				.collect() {
 			Ok(o) => o,
 			Err(e) => Err(e)?,
@@ -346,7 +346,7 @@ pub enum ChangeAction {
 }
 
 impl ProcessedScheduleItem { // XXX TODO move closer to definition
-	pub fn from(tz: &Tz, raw: &RawScheduleItem, sunset_time: &DateTime<Tz>) -> anyhow::Result<Self> {
+	pub fn from(tz: &Tz, raw: &RawScheduleItem, today: NaiveDate, sunset_time: &DateTime<Tz>) -> anyhow::Result<Self> {
 		let hour = raw.hour.unwrap_or(0);
 		let minute = raw.minute.unwrap_or(0);
 		let time = match &raw.from {
@@ -358,7 +358,7 @@ impl ProcessedScheduleItem { // XXX TODO move closer to definition
 			Some(s) => Err(anyhow::anyhow!(
 				"Unexpected `from` value {s} while constructing {}.",
 				std::any::type_name::<ProcessedScheduleItem>()))?,
-			None => time_to_today_tz(tz, hour as u8, minute as u8)
+			None => time_to_today_tz(tz, today, hour as u8, minute as u8)
 				.context(format!("Unable to convert hour {hour} and minute {minute} to time tz."))?,
 		};
 		Ok(ProcessedScheduleItem {
@@ -374,9 +374,7 @@ pub fn tz_now<T: TimeZone>(tz: &T) -> Option<DateTime<T>> {
 	tz.from_local_datetime(&now).earliest()
 }
 
-pub fn time_to_today_tz<T: TimeZone>(tz: &T, hour: u8, minute: u8) -> anyhow::Result<DateTime<T>> {
-	let now = chrono::Local::now();
-	let today = now.date_naive();
+pub fn time_to_today_tz<T: TimeZone>(tz: &T, today: NaiveDate, hour: u8, minute: u8) -> anyhow::Result<DateTime<T>> {
 	time_to_datetime_tz(tz, hour, minute, today)
 }
 
@@ -545,5 +543,44 @@ mod tests {
 		assert!(get_surrounding_schedule_items(&schedule, get_tz_datetime(0, 0)).is_err());
 		assert!(get_surrounding_schedule_items(&schedule, get_tz_datetime(20, 30)).is_err());
 		assert!(get_surrounding_schedule_items(&schedule, get_tz_datetime(20, 31)).is_err());
+	}
+
+	fn assert_schedule(
+		hour: Option<i8>,
+		minute: Option<i8>,
+		from: Option<super::From>,
+		sunset_hour: u32,
+		sunset_minute: u32,
+		expected_hour: u32,
+		expected_minute: u32)
+	{
+		let today = chrono::NaiveDate::from_ymd_opt(1999, 1, 1).expect("Getting today");
+		let none_change = ChangeItem {
+			action: Action::Stop,
+			mirek: Some(123),
+			brightness: None,
+		};
+		let item = ProcessedScheduleItem::from(
+			&TEST_TZ,
+			&super::RawScheduleItem { hour, minute, from, change: none_change.clone() },
+			today,
+			&get_tz_datetime(sunset_hour, sunset_minute)).expect("Expected item1 config to be fine.");
+
+		assert_eq!(item.time, get_tz_datetime(expected_hour, expected_minute));
+		assert_eq!(item.change, none_change);
+	}
+
+	#[test]
+	fn test_schedule_item_processing () {
+		assert_schedule(Some(10), Some(20), None,
+			2, 2, 10, 20);
+		assert_schedule(Some(10), Some(20), Some(super::From::Sunset),
+			2, 2, 12, 22);
+		assert_schedule(Some(-3), None, Some(super::From::Sunset),
+			20, 40, 17, 40);
+		assert_schedule(None, Some(-3), Some(super::From::Sunset),
+			20, 40, 20, 37);
+		assert_schedule(None, Some(120), Some(super::From::Sunset),
+			10, 30, 12, 30);
 	}
 }
