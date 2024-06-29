@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 dotenv.config();
 
+import cron from "node-cron";
 import express from "express";
 import Joi from "joi"
 
@@ -62,6 +63,10 @@ app.put('/toggle-group', async (req: express.Request, res: express.Response) => 
 
 app.get('/status', (req: express.Request, res: express.Response) => {
 	res.json({ status: "up" });
+});
+
+cron.schedule('*/10 * * * * *', () => {
+	console.log(`${new Date()} running a task every so and so.`);
 });
 
 app.listen(process.env.EXPRESS_PORT, () => {
