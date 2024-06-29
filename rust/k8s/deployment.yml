@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: rust-pod
+  namespace: default
+  labels:
+    app: rust
+spec:
+  containers:
+    - name: rust-container
+      image: registry.blahblahblah.xyz/rust-hue:arm-1.0
+      ports:
+        - containerPort: 8000
+          name: rocket-port
+      resources:
+        limits:
+          memory: "512Mi"
+          cpu: "100m"
+      env:
+        - name: SCHEDULE_YAML_PATH
+          value: /data/schedule.yml
+      volumeMounts:
+        - name: rust-hue-schedule
+          mountPath: /data/
+  volumes:
+    - name: rust-hue-schedule
+      secret:
+        secretName: rust-hue-schedule
+  imagePullSecrets:
+    - name: image-pull-secret
