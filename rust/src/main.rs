@@ -1,5 +1,6 @@
 mod schedule;
 mod sunset;
+mod time;
 
 #[macro_use] extern crate rocket;
 

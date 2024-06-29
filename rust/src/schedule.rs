@@ -1,11 +1,11 @@
 use std::{env, fmt, fs::File, io::BufReader, str::FromStr};
 
 use anyhow::Context;
-use chrono::{DateTime, NaiveDate, NaiveTime, TimeDelta, TimeZone};
+use chrono::{DateTime, NaiveDate, TimeDelta};
 use chrono_tz::Tz;
 use rocket::serde;
 
-use crate::sunset::get_sunset_time;
+use crate::{sunset::get_sunset_time, time::{time_to_today_tz, tz_now}};
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 #[serde(crate = "rocket::serde")]
@@ -92,20 +92,34 @@ pub struct ProcessedScheduleItem {
 	change: ChangeItem,
 }
 
+impl ProcessedScheduleItem {
+	pub fn from(tz: &Tz, raw: &RawScheduleItem, today: NaiveDate, sunset_time: &DateTime<Tz>) -> anyhow::Result<Self> {
+		let hour = raw.hour.unwrap_or(0);
+		let minute = raw.minute.unwrap_or(0);
+		let time = match &raw.from {
+			Some(s) if s == &From::Sunset => {
+				let delta = TimeDelta::hours(hour as i64) + TimeDelta::minutes(minute as i64);
+				let r: DateTime<Tz> = *sunset_time + delta;
+				r
+			},
+			Some(s) => Err(anyhow::anyhow!(
+				"Unexpected `from` value {s} while constructing {}.",
+				std::any::type_name::<ProcessedScheduleItem>()))?,
+			None => time_to_today_tz(tz, today, hour as u8, minute as u8)
+				.context(format!("Unable to convert hour {hour} and minute {minute} to time tz."))?,
+		};
+		Ok(ProcessedScheduleItem {
+			change: raw.change.clone(),
+			time,
+		})
+	}
+}
+
 #[derive(Debug, serde::Deserialize)]
 #[serde(crate = "rocket::serde")]
 pub struct ScheduleYamlConfig {
 	location: LocationConfig,
 	schedule: Vec<RawScheduleItem>,
-}
-
-#[derive(Debug)]
-pub struct Schedule {
-	yaml_path: String,
-    tz: Tz,
-	location: LocationConfig,
-	pub raw_schedule: Vec<RawScheduleItem>,
-	pub todays_schedule: Option<Vec<ProcessedScheduleItem>>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -130,6 +144,15 @@ pub struct DebugInfo {
 fn get_file_modification_time(path: &str) -> anyhow::Result<std::time::SystemTime> {
     let metadata = std::fs::metadata(path)?;
 	Ok(metadata.modified()?)
+}
+
+#[derive(Debug)]
+pub struct Schedule {
+	yaml_path: String,
+    tz: Tz,
+	location: LocationConfig,
+	pub raw_schedule: Vec<RawScheduleItem>,
+	pub todays_schedule: Option<Vec<ProcessedScheduleItem>>,
 }
 
 impl Schedule {
@@ -355,51 +378,6 @@ where T: Into<f64>{
 pub enum ChangeAction {
 	None,
 	Color {mirek: u16, brightness: u8},
-}
-
-impl ProcessedScheduleItem { // XXX TODO move closer to definition
-	pub fn from(tz: &Tz, raw: &RawScheduleItem, today: NaiveDate, sunset_time: &DateTime<Tz>) -> anyhow::Result<Self> {
-		let hour = raw.hour.unwrap_or(0);
-		let minute = raw.minute.unwrap_or(0);
-		let time = match &raw.from {
-			Some(s) if s == &From::Sunset => {
-				let delta = TimeDelta::hours(hour as i64) + TimeDelta::minutes(minute as i64);
-				let r: DateTime<Tz> = *sunset_time + delta;
-				r
-			},
-			Some(s) => Err(anyhow::anyhow!(
-				"Unexpected `from` value {s} while constructing {}.",
-				std::any::type_name::<ProcessedScheduleItem>()))?,
-			None => time_to_today_tz(tz, today, hour as u8, minute as u8)
-				.context(format!("Unable to convert hour {hour} and minute {minute} to time tz."))?,
-		};
-		Ok(ProcessedScheduleItem {
-			change: raw.change.clone(),
-			time,
-		})
-	}
-}
-
-// XXX TODO: move fns to time.rs
-pub fn tz_now<T: TimeZone>(tz: &T) -> DateTime<T> {
-	let now = chrono::Utc::now().naive_local();
-	tz.from_utc_datetime(&now)
-}
-
-pub fn time_to_today_tz<T: TimeZone>(tz: &T, today: NaiveDate, hour: u8, minute: u8) -> anyhow::Result<DateTime<T>> {
-	time_to_datetime_tz(tz, hour, minute, today)
-}
-
-fn time_to_datetime_tz<T: TimeZone>(tz: &T, hour: u8, minute: u8, date: NaiveDate) -> anyhow::Result<DateTime<T>> {
-	let naive_time = match NaiveTime::from_hms_opt(hour.into(), minute.into(), 0) {
-		Some(t) => t,
-		None => return Err(anyhow::anyhow!("Could not construct NaiveTime from hour={}, minute={}.", hour, minute)),
-	};
-	let naive_datetime = date.and_time(naive_time);
-	match tz.from_local_datetime(&naive_datetime).earliest() {
-		Some(t) => Ok(t),
-		None => Err(anyhow::anyhow!("Could not convert local ({naive_datetime}) to tz datetime.")),
-	}
 }
 
 #[cfg(test)]
