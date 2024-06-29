@@ -188,7 +188,7 @@ function getLightsOnInGroup(lights: LightBody, rids: string[]): LightData[] {
 	return _.filter(lights.data, (light: LightData) =>
 		_.includes(rids, light.id) && light.on.on === true);
 }
-export enum Change {
+export enum GroupChange {
 	ON = "on",
 	OFF = "off",
 	TOGGLE = "toggle"
@@ -213,20 +213,20 @@ export async function updateColor(mirek: number, brightness: number, activateSce
 	}
 }
 
-export async function toggleGroup(state: State, group: string, change: Change) {
+export async function toggleGroup(state: State, group: string, change: GroupChange) {
 	const lights = await getLights();
 	const groupLights = state.getLightsForGroup(group);
 	const groupRids = getRids(groupLights);
 	const lightsOnInGroup = getLightsOnInGroup(lights, groupRids);
 	let turnOn = false;
 	switch(change) {
-		case Change.ON:
+		case GroupChange.ON:
 			turnOn = true;
 			break;
-		case Change.OFF:
+		case GroupChange.OFF:
 			turnOn = false;
 			break;
-		case Change.TOGGLE:
+		case GroupChange.TOGGLE:
 			turnOn = lightsOnInGroup.length === 0;
 			break;
 		default:

@@ -4,7 +4,7 @@ dotenv.config();
 import express from "express";
 import Joi from "joi"
 
-import { Change, createState, toggleGroup, updateColor } from "./hue";
+import { GroupChange, createState, toggleGroup, updateColor } from "./hue";
 
 function handleErrorResponse(error: Error, res: express.Response): void {
 	res.statusCode = 400;
@@ -44,7 +44,7 @@ app.put('/update-color', async (req: express.Request, res: express.Response) => 
 
 interface ToggleGroupBody {
 	group: string,
-	change: Change,
+	change: GroupChange,
 }
 const toggleGroupSchema = Joi.object<ToggleGroupBody>({
 	group: Joi.string().required(),
