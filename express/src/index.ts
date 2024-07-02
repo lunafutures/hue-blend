@@ -56,22 +56,22 @@ app.put('/update-color', async (req: express.Request, res: express.Response) => 
 });
 
 interface SetGroupBody {
-	group: string,
+	groupName: string,
 	change: GroupChange,
 	mirek?: number,
 	brightness?: number,
 }
 const setGroupSchema = Joi.object<SetGroupBody>({
-	group: Joi.string().required(),
+	groupName: Joi.string().required(),
 	change: Joi.string().required(),
 	mirek: Joi.number().min(153).max(500),
 	brightness: Joi.number().min(0).max(100),
 })
 app.put('/set-group', async (req: express.Request, res: express.Response) => {
 	try {
-		const { group, change, mirek, brightness } =
+		const { groupName, change, mirek, brightness } =
 			throwableValidation<SetGroupBody>(req.body, setGroupSchema);
-		await setGroup(group, change, mirek, brightness);
+		await setGroup(groupName, change, mirek, brightness);
 		res.json({});
 	} catch(error) {
 		handleErrorResponse(error as Error, res);
