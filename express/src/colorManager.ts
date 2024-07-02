@@ -8,13 +8,13 @@ interface ProcessEnv {
 	RUST_HUE_URL: string,
 	PERIODIC_UPDATE_CRON_STRING: string,
 	PERIODIC_UPDATE_ANIMATION_DURATION_MS: number,
-	HUE_HOME_GROUP_ID: number,
+	HUE_ALL_LIGHTS_GROUP_NAME: string,
 }
 const envSchema = Joi.object<ProcessEnv>({
 	RUST_HUE_URL: Joi.string().required(),
 	PERIODIC_UPDATE_CRON_STRING: Joi.string().required(),
 	PERIODIC_UPDATE_ANIMATION_DURATION_MS: Joi.number().min(0).required(),
-	HUE_HOME_GROUP_ID: Joi.string().required(),
+	HUE_ALL_LIGHTS_GROUP_NAME: Joi.string().required(),
 });
 const { error, value: processEnv } = envSchema.validate(
 	process.env, { allowUnknown: true});
@@ -80,11 +80,12 @@ async function getNowChange(): Promise<NowChange> {
 async function getAndApplyChange() {
 	let nowChange = await getNowChange();
 	if (nowChange.change_action === "none" ) {
+		console.log("No change to be made.")
 		return;
 	}
 	let changeColor = nowChange.change_action.color;
 	await updateColor(
-		processEnv.HUE_HOME_GROUP_ID,
+		processEnv.HUE_ALL_LIGHTS_GROUP_NAME,
 		changeColor.mirek,
 		changeColor.brightness); // XXX committed value is not exact, but should be within 1
 }

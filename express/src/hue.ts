@@ -59,10 +59,16 @@ interface Error {
 
 interface Group {
 	id: string,
-	id_v1: string,
+	rid: string,
 	children: Resource[],
 	metadata: Metadata,
 	type: string
+}
+
+interface GroupedLights {
+	id: string,
+	id_v1: string,
+	owner: Resource,
 }
 
 interface Action {
@@ -110,6 +116,11 @@ interface GenericBody {
 	errors: Error[],
 }
 
+interface HueResponse<T> {
+	data: T[]
+	errors: Error[],
+}
+
 type IndividualDictionary = {
 	[key: string]: Group;
 }
@@ -125,20 +136,27 @@ export class State {
 	}
 
 	async populateGroups() {
+		const groupedLights = await getGroupedLights();
+		const groupRidToId = _.fromPairs(_.map(groupedLights.data, item => [item.owner.rid, item.id]));
+
 		this.zones = await getZones();
 		this.zones.data.forEach(group => {
 			this.groups[group.metadata.name] = group;
-			console.log(`Found zone: ${group.metadata.name} (rid: ${group.id}).`);
+			const rid = this.groups[group.metadata.name].rid = group.id;
+			const gid = this.groups[group.metadata.name].id = groupRidToId[rid];
+			console.log(`Found zone: ${group.metadata.name} (rid: ${group.rid}, id: ${gid}).`);
 		});
 
 		this.rooms = await getRooms();
 		this.rooms.data.forEach(group => {
 			this.groups[group.metadata.name] = group;
-			console.log(`Found room: ${group.metadata.name} (rid: ${group.id}).`);
-		})
+			const rid = this.groups[group.metadata.name].rid = group.id;
+			const gid = this.groups[group.metadata.name].id = groupRidToId[rid];
+			console.log(`Found room: ${group.metadata.name} (rid: ${group.rid}, id: ${gid}).`);
+		});
 	}
 
-	getLightsForGroup(groupName: string): Group {
+	getGroup(groupName: string): Group {
 		if (!this.groups.hasOwnProperty(groupName)) {
 			throw new Error(`Group "${groupName}" not found in the object.`);
 		}
@@ -183,6 +201,14 @@ function getRooms() {
 	return getGroups(`${hueBridgeBaseUrl}/clip/v2/resource/room`);
 }
 
+async function getGroupedLights() {
+	const response = await hueRequest({
+		method: "get",
+		url: `${hueBridgeBaseUrl}/clip/v2/resource/grouped_light`,
+	});
+	return response.data as HueResponse<GroupedLights>;
+}
+
 function getRids(group: Group): string[] {
 	return _.map(group.children, resource => resource.rid);
 }
@@ -198,11 +224,14 @@ function getLightsOnInGroup(lights: LightBody, rids: string[]): LightData[] {
 		_.includes(rids, light.id) && light.on.on === true);
 }
 
-export async function updateColor(groupId: string, mirek: number, brightness: number) {
+export async function updateColor(groupName: string, mirek: number, brightness: number) {
 	console.log(`Updating color: mirek=${mirek} brightness=${brightness}`);
+	// TODO XXX: Check grouped light color before updating
+	
+	const group = (await state).getGroup(groupName);
 	const response = await hueRequest({
 		method: "put",
-		url: `${hueBridgeBaseUrl}/clip/v2/resource/grouped_light/${groupId}`,
+		url: `${hueBridgeBaseUrl}/clip/v2/resource/grouped_light/${group.id}`,
 		data: {
 			type: "grouped_light",
 			dimming: { brightness },
@@ -238,13 +267,50 @@ export async function updateColorScene(mirek: number, brightness: number, durati
 export enum GroupChange {
 	ON = "on",
 	OFF = "off",
-	TOGGLE = "toggle"
+	TOGGLE = "toggle",
+	NONE = "none",
 }
 
-export async function setGroupScene(group: string, change: GroupChange) {
-	const lights = await getLights();
-	const groupLights = state.getLightsForGroup(group);
+interface OnOn {
+	on?: { on: boolean },
+}
+
+function getOnOn(groupChange: GroupChange, numLightsOn: number): OnOn {
+	switch(groupChange) {
+		case GroupChange.ON: return { on: { on: true } };
+		case GroupChange.OFF: return { on: { on: false } };
+		case GroupChange.TOGGLE: return { on: { on: numLightsOn === 0 } };
+		case GroupChange.NONE: return {};
+		default:
+			throw(new Error(`Unexpected change type: ${groupChange}`));
+	}
+}
+
+export async function setGroup(groupName: string, change: GroupChange) {
+	const lightsOnInGroup = getLightsOnInGroup(
+		await getLights(),
+		getRids((await state).getGroup(groupName)));
+	let onOn = getOnOn(change, lightsOnInGroup.length);
+	console.log(`Setting group "${groupName}": ${onOn}`);
+
+	const group = (await state).getGroup(groupName);
+	const response = await hueRequest({
+		method: "put",
+		url: `${hueBridgeBaseUrl}/clip/v2/resource/grouped_light/${group.id}`,
+		data: {
+			...onOn,
+			type: "grouped_light",
+			// dimming: { brightness },
+			// color_temperature: { mirek },
+		},
+	});
+	return response.data as GenericBody;
+}
+
+export async function setGroupScene(groupName: string, change: GroupChange) {
+	const groupLights = (await state).getGroup(groupName);
 	const groupRids = getRids(groupLights);
+	const lights = await getLights();
 	const lightsOnInGroup = getLightsOnInGroup(lights, groupRids);
 	let turnOn = false;
 	switch(change) {
@@ -260,7 +326,7 @@ export async function setGroupScene(group: string, change: GroupChange) {
 		default:
 			throw(new Error(`Unexpected change type: ${change}`));
 	}
-	console.log(`Toggling group "${group}" to ${(turnOn? "on": "off")}`);
+	console.log(`Toggling group "${groupName}" to ${(turnOn? "on": "off")}`);
 
 	const automationScene = await getAutomationScene();
 	automationScene.data = automationScene.data.map(scene => {
@@ -364,4 +430,4 @@ function hueRequest<D>(config: Partial<AxiosRequestConfig<D>>): Promise<AxiosRes
 	});
 }
 
-const state = new State(); // XXX
+const state = createState();
