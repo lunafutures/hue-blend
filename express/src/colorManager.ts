@@ -2,7 +2,7 @@
 import Joi from "joi";
 import axios from "axios";
 import cron from "node-cron";
-import { updateColor } from "./hue";
+import { updateColorScene } from "./hue";
 
 interface ProcessEnv {
 	RUST_HUE_URL: string,
@@ -81,7 +81,7 @@ async function getAndApplyChange() {
 		return;
 	}
 	let changeColor = nowChange.change_action.color;
-	await updateColor(
+	await updateColorScene(
 		changeColor.mirek,
 		changeColor.brightness,
 		processEnv.PERIODIC_UPDATE_ANIMATION_DURATION_MS);

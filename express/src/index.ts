@@ -4,7 +4,7 @@ dotenv.config();
 import express from "express";
 import Joi from "joi"
 
-import { GroupChange, setGroup, updateColor } from "./hue";
+import { GroupChange, setGroupScene, updateColorScene } from "./hue";
 import { startPeriodicUpdate } from "./colorManager";
 
 interface ProcessEnv {
@@ -48,7 +48,7 @@ const updateColorSchema = Joi.object<UpdateColorBody>({
 app.put('/update-color', async (req: express.Request, res: express.Response) => {
 	try {
 		const { mirek, brightness } = throwableValidation<UpdateColorBody>(req.body, updateColorSchema);
-		await updateColor(mirek, brightness, 0);
+		await updateColorScene(mirek, brightness, 0);
 		res.json({})
 	} catch(error) {
 		handleErrorResponse(error as Error, res);
@@ -66,7 +66,7 @@ const setGroupSchema = Joi.object<SetGroupBody>({
 app.put('/set-group', async (req: express.Request, res: express.Response) => {
 	try {
 		const { group, change } = throwableValidation<SetGroupBody>(req.body, setGroupSchema);
-		await setGroup(group, change);
+		await setGroupScene(group, change);
 		res.json({});
 	} catch(error) {
 		handleErrorResponse(error as Error, res);

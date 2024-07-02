@@ -203,7 +203,7 @@ export enum GroupChange {
 	TOGGLE = "toggle"
 }
 
-export async function updateColor(mirek: number, brightness: number, duration: number) {
+export async function updateColorScene(mirek: number, brightness: number, duration: number) {
 	console.log(`Updating color, mirek: ${mirek}, brightness: ${brightness}`);
 	const lights = await getLights();
 	const lightsOnRids = getLightsOn(lights);
@@ -226,7 +226,7 @@ export async function updateColor(mirek: number, brightness: number, duration: n
 	await activateAutomationScene(duration, brightness);
 }
 
-export async function setGroup(group: string, change: GroupChange) {
+export async function setGroupScene(group: string, change: GroupChange) {
 	const lights = await getLights();
 	const groupLights = state.getLightsForGroup(group);
 	const groupRids = getRids(groupLights);
