@@ -286,22 +286,28 @@ function getOnOn(groupChange: GroupChange, numLightsOn: number): OnOn {
 	}
 }
 
-export async function setGroup(groupName: string, change: GroupChange) {
+export async function setGroup(groupName: string, change: GroupChange, brightness?: number, mirek?: number) {
 	const lightsOnInGroup = getLightsOnInGroup(
 		await getLights(),
 		getRids((await state).getGroup(groupName)));
 	let onOn = getOnOn(change, lightsOnInGroup.length);
-	console.log(`Setting group "${groupName}": ${onOn}`);
+
+	let brightnessConfig = brightness === undefined ? {} :
+		{ dimming: { brightness }};
+	let mirekConfig = mirek === undefined ? {} :
+		{ color_temperature: { mirek }};
+
+	console.log(`Setting group "${groupName}": ${onOn} ${brightnessConfig} ${mirekConfig}`);
 
 	const group = (await state).getGroup(groupName);
 	const response = await hueRequest({
 		method: "put",
 		url: `${hueBridgeBaseUrl}/clip/v2/resource/grouped_light/${group.id}`,
 		data: {
-			...onOn,
 			type: "grouped_light",
-			// dimming: { brightness },
-			// color_temperature: { mirek },
+			...onOn,
+			...brightnessConfig,
+			...mirekConfig,
 		},
 	});
 	return response.data as GenericBody;
