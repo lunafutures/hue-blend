@@ -286,16 +286,16 @@ function getOnOn(groupChange: GroupChange, numLightsOn: number): OnOn {
 	}
 }
 
-export async function setGroup(groupName: string, change: GroupChange, brightness?: number, mirek?: number) {
+export async function setGroup(groupName: string, change: GroupChange, mirek?: number, brightness?: number) {
 	const lightsOnInGroup = getLightsOnInGroup(
 		await getLights(),
 		getRids((await state).getGroup(groupName)));
 	let onOn = getOnOn(change, lightsOnInGroup.length);
 
-	let brightnessConfig = brightness === undefined ? {} :
-		{ dimming: { brightness }};
 	let mirekConfig = mirek === undefined ? {} :
 		{ color_temperature: { mirek }};
+	let brightnessConfig = brightness === undefined ? {} :
+		{ dimming: { brightness }};
 
 	console.log(`Setting group "${groupName}": ${onOn} ${brightnessConfig} ${mirekConfig}`);
 
@@ -306,8 +306,8 @@ export async function setGroup(groupName: string, change: GroupChange, brightnes
 		data: {
 			type: "grouped_light",
 			...onOn,
-			...brightnessConfig,
 			...mirekConfig,
+			...brightnessConfig,
 		},
 	});
 	return response.data as GenericBody;
