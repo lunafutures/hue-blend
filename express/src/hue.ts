@@ -121,17 +121,20 @@ export class State {
 
 	constructor() {
 		this.groups = {};
+		this.populateGroups();
 	}
 
 	async populateGroups() {
 		this.zones = await getZones();
 		this.zones.data.forEach(group => {
 			this.groups[group.metadata.name] = group;
+			console.log(`Found zone: ${group.metadata.name} (rid: ${group.id}).`);
 		});
 
 		this.rooms = await getRooms();
 		this.rooms.data.forEach(group => {
 			this.groups[group.metadata.name] = group;
+			console.log(`Found room: ${group.metadata.name} (rid: ${group.id}).`);
 		})
 	}
 
@@ -223,7 +226,7 @@ export async function updateColor(mirek: number, brightness: number, duration: n
 	await activateAutomationScene(duration, brightness);
 }
 
-export async function toggleGroup(state: State, group: string, change: GroupChange) {
+export async function setGroup(group: string, change: GroupChange) {
 	const lights = await getLights();
 	const groupLights = state.getLightsForGroup(group);
 	const groupRids = getRids(groupLights);
@@ -345,3 +348,5 @@ function hueRequest<D>(config: Partial<AxiosRequestConfig<D>>): Promise<AxiosRes
 		...config,
 	});
 }
+
+const state = new State(); // XXX

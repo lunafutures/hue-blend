@@ -4,7 +4,7 @@ dotenv.config();
 import express from "express";
 import Joi from "joi"
 
-import { GroupChange, createState, toggleGroup, updateColor } from "./hue";
+import { GroupChange, setGroup, updateColor } from "./hue";
 import { startPeriodicUpdate } from "./colorManager";
 
 interface ProcessEnv {
@@ -55,18 +55,18 @@ app.put('/update-color', async (req: express.Request, res: express.Response) => 
 	}
 });
 
-interface ToggleGroupBody {
+interface SetGroupBody {
 	group: string,
 	change: GroupChange,
 }
-const toggleGroupSchema = Joi.object<ToggleGroupBody>({
+const setGroupSchema = Joi.object<SetGroupBody>({
 	group: Joi.string().required(),
 	change: Joi.string().required(),
 })
-app.put('/toggle-group', async (req: express.Request, res: express.Response) => {
+app.put('/set-group', async (req: express.Request, res: express.Response) => {
 	try {
-		const { group, change } = throwableValidation<ToggleGroupBody>(req.body, toggleGroupSchema);
-		await toggleGroup(await createState(), group, change);
+		const { group, change } = throwableValidation<SetGroupBody>(req.body, setGroupSchema);
+		await setGroup(group, change);
 		res.json({});
 	} catch(error) {
 		handleErrorResponse(error as Error, res);
