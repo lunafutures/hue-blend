@@ -40,12 +40,10 @@ app.use(express.json());
 interface UpdateColorBody {
 	mirek: number,
 	brightness: number,
-	shouldActivate: boolean,
 }
 const updateColorSchema = Joi.object<UpdateColorBody>({
 	mirek: Joi.number().min(153).max(500).required(),
 	brightness: Joi.number().min(0).max(100).required(),
-	shouldActivate: Joi.boolean().required(),
 });
 app.put('/update-color', async (req: express.Request, res: express.Response) => {
 	try {
