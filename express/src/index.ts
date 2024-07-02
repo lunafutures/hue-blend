@@ -73,8 +73,8 @@ app.put('/toggle-group', async (req: express.Request, res: express.Response) => 
 	}
 });
 
-app.get('/status', (_req: express.Request, res: express.Response) => {
-	res.json({ status: "up" });
+app.get('/', (_req: express.Request, res: express.Response) => {
+	res.json({ up: true });
 });
 
 startPeriodicUpdate();
