@@ -86,7 +86,7 @@ async function getAndApplyChange() {
 	await updateColor(
 		processEnv.HUE_HOME_GROUP_ID,
 		changeColor.mirek,
-		changeColor.brightness);
+		changeColor.brightness); // XXX committed value is not exact, but should be within 1
 }
 
 export function startPeriodicUpdate() {
