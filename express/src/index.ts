@@ -66,12 +66,42 @@ const setGroupSchema = Joi.object<SetGroupBody>({
 	change: Joi.string().required(),
 	mirek: Joi.number().min(153).max(500),
 	brightness: Joi.number().min(0).max(100),
-})
+});
 app.put('/set-group', async (req: express.Request, res: express.Response) => {
 	try {
 		const { groupName, change, mirek, brightness } =
 			throwableValidation<SetGroupBody>(req.body, setGroupSchema);
 		await setGroup(groupName, change, mirek, brightness);
+		res.json({});
+	} catch(error) {
+		handleErrorResponse(error as Error, res);
+	}
+});
+
+const BRIGHT_MIREK = 233;
+const BRIGHT_BRIGHTNESS = 100
+const DARK_MIREK = 500;
+const DARK_BRIGHTNESS = 50;
+
+interface SimpleSetBody {
+	groupName: string,
+}
+const simpleSetSchema = Joi.object<SimpleSetBody>({
+	groupName: Joi.string().required(),
+});
+app.put('/set-bright', async (req: express.Request, res: express.Response) => {
+	try {
+		const { groupName } = throwableValidation<SimpleSetBody>(req.body, simpleSetSchema);
+		await setGroup(groupName, GroupChange.ON, BRIGHT_MIREK, BRIGHT_BRIGHTNESS);
+		res.json({});
+	} catch(error) {
+		handleErrorResponse(error as Error, res);
+	}
+});
+app.put('/set-dark', async (req: express.Request, res: express.Response) => {
+	try {
+		const { groupName } = throwableValidation<SimpleSetBody>(req.body, simpleSetSchema);
+		await setGroup(groupName, GroupChange.ON, DARK_MIREK, DARK_BRIGHTNESS);
 		res.json({});
 	} catch(error) {
 		handleErrorResponse(error as Error, res);
