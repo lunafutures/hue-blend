@@ -1,12 +1,23 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-import cron from "node-cron";
 import express from "express";
 import Joi from "joi"
 
 import { GroupChange, createState, toggleGroup, updateColor } from "./hue";
-import { getAndApplyChange } from "./colorManager";
+import { startPeriodicUpdate } from "./colorManager";
+
+interface ProcessEnv {
+	EXPRESS_PORT: number,
+}
+const envSchema = Joi.object<ProcessEnv>({
+	EXPRESS_PORT: Joi.number().min(0).required(),
+});
+const { error, value: processEnv } = envSchema.validate(
+	process.env, { allowUnknown: true});
+if (error) {
+	throw error;
+}
 
 function handleErrorResponse(error: Error, res: express.Response): void {
 	res.statusCode = 400;
@@ -62,15 +73,12 @@ app.put('/toggle-group', async (req: express.Request, res: express.Response) => 
 	}
 });
 
-app.get('/status', (req: express.Request, res: express.Response) => {
+app.get('/status', (_req: express.Request, res: express.Response) => {
 	res.json({ status: "up" });
 });
 
-cron.schedule('*/10 * * * * *', () => {
-	console.log(`${new Date()} running a task every so and so.`);
-	getAndApplyChange();
-});
+startPeriodicUpdate();
 
-app.listen(process.env.EXPRESS_PORT, () => {
-	console.log(`hue-express app listening on port ${process.env.EXPRESS_PORT}`);
+app.listen(processEnv.EXPRESS_PORT, () => {
+	console.log(`hue-express app listening on port ${processEnv.EXPRESS_PORT}`);
 });

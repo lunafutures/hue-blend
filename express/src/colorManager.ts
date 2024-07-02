@@ -1,12 +1,18 @@
+
 import Joi from "joi";
 import axios from "axios";
+import cron from "node-cron";
 import { updateColor } from "./hue";
 
 interface ProcessEnv {
-	RUST_HUE_URL: string;
+	RUST_HUE_URL: string,
+	PERIODIC_UPDATE_CRON_STRING: string,
+	PERIODIC_UPDATE_ANIMATION_DURATION_MS: number,
 }
 const envSchema = Joi.object<ProcessEnv>({
 	RUST_HUE_URL: Joi.string().required(),
+	PERIODIC_UPDATE_CRON_STRING: Joi.string().required(),
+	PERIODIC_UPDATE_ANIMATION_DURATION_MS: Joi.number().min(0).required(),
 });
 const { error, value: processEnv } = envSchema.validate(
 	process.env, { allowUnknown: true});
@@ -69,11 +75,20 @@ async function getNowChange(): Promise<NowChange> {
 	return nowChange;
 }
 
-export async function getAndApplyChange() {
+async function getAndApplyChange() {
 	let nowChange = await getNowChange();
 	if (nowChange.change_action === "none" ) {
 		return;
 	}
 	let changeColor = nowChange.change_action.color;
-	await updateColor(changeColor.mirek, changeColor.brightness, false, 0);
+	await updateColor(
+		changeColor.mirek,
+		changeColor.brightness,
+		processEnv.PERIODIC_UPDATE_ANIMATION_DURATION_MS);
+}
+
+export function startPeriodicUpdate() {
+	cron.schedule(processEnv.PERIODIC_UPDATE_CRON_STRING, () => {
+		getAndApplyChange();
+	});
 }

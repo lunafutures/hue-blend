@@ -201,6 +201,7 @@ export enum GroupChange {
 }
 
 export async function updateColor(mirek: number, brightness: number, duration: number) {
+	console.log(`Updating color, mirek: ${mirek}, brightness: ${brightness}`);
 	const lights = await getLights();
 	const lightsOnRids = getLightsOn(lights);
 
@@ -208,7 +209,7 @@ export async function updateColor(mirek: number, brightness: number, duration: n
 	automationScene.data = automationScene.data.map(scene => {
 		scene.actions = scene.actions.map(action => {
 			action.action.on.on = lightsOnRids.includes(action.target.rid);
-			action.action.color_temperature = { mirek }; // update here
+			action.action.color_temperature = { mirek };
 			action.action.dimming = { brightness: 100 };
 			return action;
 		});
