@@ -197,10 +197,19 @@ function getLightsOnInGroup(lights: LightBody, rids: string[]): LightData[] {
 	return _.filter(lights.data, (light: LightData) =>
 		_.includes(rids, light.id) && light.on.on === true);
 }
-export enum GroupChange {
-	ON = "on",
-	OFF = "off",
-	TOGGLE = "toggle"
+
+export async function updateColor(groupId: string, mirek: number, brightness: number) {
+	console.log(`Updating color: mirek=${mirek} brightness=${brightness}`);
+	const response = await hueRequest({
+		method: "put",
+		url: `${hueBridgeBaseUrl}/clip/v2/resource/grouped_light/${groupId}`,
+		data: {
+			type: "grouped_light",
+			dimming: { brightness },
+			color_temperature: { mirek },
+		},
+	});
+	return response.data as GenericBody;
 }
 
 export async function updateColorScene(mirek: number, brightness: number, duration: number) {
@@ -224,6 +233,12 @@ export async function updateColorScene(mirek: number, brightness: number, durati
 	}
 
 	await activateAutomationScene(duration, brightness);
+}
+
+export enum GroupChange {
+	ON = "on",
+	OFF = "off",
+	TOGGLE = "toggle"
 }
 
 export async function setGroupScene(group: string, change: GroupChange) {
