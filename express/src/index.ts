@@ -6,6 +6,7 @@ import express from "express";
 import Joi from "joi"
 
 import { GroupChange, createState, toggleGroup, updateColor } from "./hue";
+import { getAndApplyChange } from "./colorManager";
 
 function handleErrorResponse(error: Error, res: express.Response): void {
 	res.statusCode = 400;
@@ -67,6 +68,7 @@ app.get('/status', (req: express.Request, res: express.Response) => {
 
 cron.schedule('*/10 * * * * *', () => {
 	console.log(`${new Date()} running a task every so and so.`);
+	getAndApplyChange();
 });
 
 app.listen(process.env.EXPRESS_PORT, () => {

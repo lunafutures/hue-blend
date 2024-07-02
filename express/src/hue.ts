@@ -184,6 +184,12 @@ function getRids(group: Group): string[] {
 	return _.map(group.children, resource => resource.rid);
 }
 
+function getLightsOn(lights: LightBody): _.Collection<string> {
+	return _(lights.data)
+		.filter((light: LightData) => light.on.on)
+		.map(light => light.id);
+}
+
 function getLightsOnInGroup(lights: LightBody, rids: string[]): LightData[] {
 	return _.filter(lights.data, (light: LightData) =>
 		_.includes(rids, light.id) && light.on.on === true);
@@ -194,10 +200,14 @@ export enum GroupChange {
 	TOGGLE = "toggle"
 }
 
-export async function updateColor(mirek: number, brightness: number, activateScene: boolean) {
+export async function updateColor(mirek: number, brightness: number, activateScene: boolean, duration = 0) {
+	const lights = await getLights();
+	const lightsOnRids = getLightsOn(lights);
+
 	const automationScene = await getAutomationScene();
 	automationScene.data = automationScene.data.map(scene => {
 		scene.actions = scene.actions.map(action => {
+			action.action.on.on = lightsOnRids.includes(action.target.rid);
 			action.action.color_temperature = { mirek }; // update here
 			action.action.dimming = { brightness: 100 };
 			return action;
@@ -209,7 +219,7 @@ export async function updateColor(mirek: number, brightness: number, activateSce
 		await updateAutomationScene(requestData);
 	}
 	if (activateScene) {
-		await activateAutomationScene(0, brightness);
+		await activateAutomationScene(duration, brightness);
 	}
 }
 
