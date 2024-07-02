@@ -200,7 +200,7 @@ export enum GroupChange {
 	TOGGLE = "toggle"
 }
 
-export async function updateColor(mirek: number, brightness: number, activateScene: boolean, duration = 0) {
+export async function updateColor(mirek: number, brightness: number, duration: number) {
 	const lights = await getLights();
 	const lightsOnRids = getLightsOn(lights);
 
@@ -218,9 +218,8 @@ export async function updateColor(mirek: number, brightness: number, activateSce
 		const requestData = { actions: sceneGet.actions };
 		await updateAutomationScene(requestData);
 	}
-	if (activateScene) {
-		await activateAutomationScene(duration, brightness);
-	}
+
+	await activateAutomationScene(duration, brightness);
 }
 
 export async function toggleGroup(state: State, group: string, change: GroupChange) {

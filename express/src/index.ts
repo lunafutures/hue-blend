@@ -36,8 +36,8 @@ const updateColorSchema = Joi.object<UpdateColorBody>({
 });
 app.put('/update-color', async (req: express.Request, res: express.Response) => {
 	try {
-		const { mirek, brightness, shouldActivate } = throwableValidation<UpdateColorBody>(req.body, updateColorSchema);
-		await updateColor(mirek, brightness, shouldActivate);
+		const { mirek, brightness } = throwableValidation<UpdateColorBody>(req.body, updateColorSchema);
+		await updateColor(mirek, brightness, 0);
 		res.json({})
 	} catch(error) {
 		handleErrorResponse(error as Error, res);
