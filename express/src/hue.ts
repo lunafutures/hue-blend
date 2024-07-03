@@ -260,6 +260,18 @@ function getOnOn(groupChange: GroupChange, numLightsOn: number): OnOn {
 	}
 }
 
+interface MirekBrightnessConfig {
+	color_temperature?: { mirek: number },
+	dimming?: { brightness: number },
+}
+
+function getMirekBrightnessConfig(mirek?: number, brightness?: number): MirekBrightnessConfig {
+	return {
+		...(mirek !== undefined ? { color_temperature: { mirek } } : {}),
+		...(brightness !== undefined ? { dimming: { brightness } } : {}),
+	};
+}
+
 export async function setGroup(groupName: string, change: GroupChange, mirek?: number, brightness?: number) {
 	const state = await State.getInstance();
 	const lightsOnInGroup = getLightsOnInGroup(
@@ -267,12 +279,14 @@ export async function setGroup(groupName: string, change: GroupChange, mirek?: n
 		getRids(state.getGroup(groupName)));
 	const onOn = getOnOn(change, lightsOnInGroup.length);
 
-	const mirekConfig = mirek === undefined ? {} :
-		{ color_temperature: { mirek }};
-	const brightnessConfig = brightness === undefined ? {} :
-		{ dimming: { brightness }};
+	const changeAction = state.lastChange?.change_action;
+	const mirekBrightnessConfig = changeAction === undefined || changeAction === "none"
+		? getMirekBrightnessConfig(mirek, brightness)
+		: getMirekBrightnessConfig(
+			mirek ?? changeAction.color.mirek,
+			brightness ?? changeAction.color.brightness);
 
-	console.log(`Setting group "${groupName}": ${onOn} ${brightnessConfig} ${mirekConfig}`);
+	console.log(`Setting group "${groupName}": ${onOn} ${mirekBrightnessConfig}`);
 
 	const group = state.getGroup(groupName);
 	const response = await hueRequest({
@@ -281,8 +295,7 @@ export async function setGroup(groupName: string, change: GroupChange, mirek?: n
 		data: {
 			type: "grouped_light",
 			...onOn,
-			...mirekConfig,
-			...brightnessConfig,
+			...mirekBrightnessConfig,
 		},
 	});
 	return response.data as GenericBody;
