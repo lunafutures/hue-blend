@@ -61,7 +61,7 @@ export class State {
 
 	getGroup(groupName: string): Group {
 		if (!Object.prototype.hasOwnProperty.call(this.groups, groupName)) {
-			throw new Error(`Group "${groupName}" not found in the object.`);
+			throw new Error(`Group "${groupName}" not found in the state.`);
 		}
 
 		return this.groups[groupName];
