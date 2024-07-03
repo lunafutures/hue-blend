@@ -79,16 +79,16 @@ async function getNowChange(): Promise<NowChange> {
 }
 
 async function getAndApplyChange() {
-	let nowChange = await getNowChange();
+	const nowChange = await getNowChange();
 
-	let state = await State.getInstance();
+	const state = await State.getInstance();
 	state.lastChange = nowChange;
 
 	if (nowChange.change_action === "none" ) {
 		console.log("No change to be made.")
 		return;
 	}
-	let changeColor = nowChange.change_action.color;
+	const changeColor = nowChange.change_action.color;
 	await updateColor(
 		processEnv.HUE_ALL_LIGHTS_GROUP_NAME,
 		changeColor.mirek,

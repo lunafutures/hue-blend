@@ -57,7 +57,7 @@ interface LightData {
 }
 
 interface Error {
-	description: String,
+	description: string,
 }
 
 export interface Group {
@@ -265,11 +265,11 @@ export async function setGroup(groupName: string, change: GroupChange, mirek?: n
 	const lightsOnInGroup = getLightsOnInGroup(
 		await getLights(),
 		getRids(state.getGroup(groupName)));
-	let onOn = getOnOn(change, lightsOnInGroup.length);
+	const onOn = getOnOn(change, lightsOnInGroup.length);
 
-	let mirekConfig = mirek === undefined ? {} :
+	const mirekConfig = mirek === undefined ? {} :
 		{ color_temperature: { mirek }};
-	let brightnessConfig = brightness === undefined ? {} :
+	const brightnessConfig = brightness === undefined ? {} :
 		{ dimming: { brightness }};
 
 	console.log(`Setting group "${groupName}": ${onOn} ${brightnessConfig} ${mirekConfig}`);
@@ -372,7 +372,7 @@ export async function activateAutomationScene(duration: number, brightness: numb
 	return response.data as GenericBody;
 }
 
-const rateLimitedHueRequester = (function getRatedLimitedAxios<D>() {
+const rateLimitedHueRequester = (function() {
 	// Allows not specifying "rejectUnauthorized: false"
 	const httpsAgent = new https.Agent({
 		ca: fs.readFileSync(hueBridgeCertPath),
