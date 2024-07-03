@@ -22,8 +22,7 @@ const env = new EnvValidator<ProcessEnv>(envSchema);
 
 function handleErrorResponse(error: Error, res: express.Response): void {
 	logger.error(`${error.message}`);
-	res.statusCode = 400;
-	res.json({ error: { name: error.name, message: error.message } });
+	res.status(400).json({ error: { name: error.name, message: error.message } });
 }
 
 function throwableValidation<T>(obj: object, schema: Joi.ObjectSchema<T>): T {
@@ -133,11 +132,8 @@ app.get('/', (_req: express.Request, res: express.Response) => {
 	}
 });
 
-app.use((err: Error, _req: unknown, res: express.Response, _next: unknown): void => {
-	logger.error(`${err.message}`);
-	res.status(400).json({ error: err.message });
-
-	res.json({ error: { name: error.name, message: error.message } });
+app.use((error: Error, _req: unknown, res: express.Response, _next: unknown): void => {
+	handleErrorResponse(error, res);
 });
 
 startPeriodicUpdate();
