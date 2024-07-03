@@ -9,7 +9,6 @@ export class EnvValidator<T> {
 	}
 
 	initialize() {
-		console.log("initializeing envvalidator", console.trace());
 		const { error, value: processEnv } = this.schema.validate(
 			process.env, { allowUnknown: true});
 		if (error) {
