@@ -88,34 +88,6 @@ export type IndividualDictionary = {
 	[key: string]: Group;
 }
 
-async function getGroups(url: string): Promise<GroupBody> {
-	const response = await hueRequest({
-		method: "get",
-		url,
-	});
-	return response.data as GroupBody;
-}
-
-export function getZones() {
-	return getGroups(`${processEnv.HUE_BRIDGE_BASE_URL}/clip/v2/resource/zone`);
-}
-
-export function getRooms() {
-	return getGroups(`${processEnv.HUE_BRIDGE_BASE_URL}/clip/v2/resource/room`);
-}
-
-export async function getGroupedLights() {
-	const response = await hueRequest({
-		method: "get",
-		url: `${processEnv.HUE_BRIDGE_BASE_URL}/clip/v2/resource/grouped_light`,
-	});
-	return response.data as HueResponse<GroupedLights>;
-}
-
-function getRids(group: Group): string[] {
-	return _.map(group.children, resource => resource.rid);
-}
-
 function getLightsOnInGroup(lights: LightBody, rids: string[]): LightData[] {
 	return _.filter(lights.data, (light: LightData) =>
 		_.includes(rids, light.id) && light.on.on === true);
@@ -145,6 +117,10 @@ function noLightsDeviate(lights: LightBody, rids: string[], desiredMirek: number
 
 		return true;
 	});
+}
+
+function getRids(group: Group): string[] {
+	return _.map(group.children, resource => resource.rid);
 }
 
 export async function updateColor(groupName: string, mirek: number, brightness: number) {
@@ -203,6 +179,38 @@ function getMirekBrightnessConfig(mirek?: number, brightness?: number): MirekBri
 	};
 }
 
+async function getGroups(url: string): Promise<GroupBody> {
+	const response = await hueRequest({
+		method: "get",
+		url,
+	});
+	return response.data as GroupBody;
+}
+
+export function getZones() {
+	return getGroups(`${processEnv.HUE_BRIDGE_BASE_URL}/clip/v2/resource/zone`);
+}
+
+export function getRooms() {
+	return getGroups(`${processEnv.HUE_BRIDGE_BASE_URL}/clip/v2/resource/room`);
+}
+
+export async function getGroupedLights() {
+	const response = await hueRequest({
+		method: "get",
+		url: `${processEnv.HUE_BRIDGE_BASE_URL}/clip/v2/resource/grouped_light`,
+	});
+	return response.data as HueResponse<GroupedLights>;
+}
+
+export async function getLights(): Promise<LightBody> {
+	const response = await hueRequest({
+		method: "get",
+		url: `${processEnv.HUE_BRIDGE_BASE_URL}/clip/v2/resource/light`,
+	});
+	return response.data as LightBody;
+}
+
 export async function setGroup(groupName: string, change: GroupChange, mirek?: number, brightness?: number) {
 	const state = await State.getInstance();
 	const lightsOnInGroup = getLightsOnInGroup(
@@ -232,17 +240,9 @@ export async function setGroup(groupName: string, change: GroupChange, mirek?: n
 	return response.data as GenericBody;
 }
 
-export async function getLights(): Promise<LightBody> {
-	const response = await hueRequest({
-		method: "get",
-		url: `${processEnv.HUE_BRIDGE_BASE_URL}/clip/v2/resource/light`,
-	});
-	return response.data as LightBody;
-}
-
 const rateLimitedHueRequester = (function() {
-	// Allows not specifying "rejectUnauthorized: false"
 	const httpsAgent = new https.Agent({
+		// Allows not specifying "rejectUnauthorized: false"
 		ca: fs.readFileSync(processEnv.HUE_BRIDGE_CACERT_PEM_PATH),
 		checkServerIdentity: (hostname, cert) => {
 			const tlsResult = tls.checkServerIdentity(hostname, cert);
