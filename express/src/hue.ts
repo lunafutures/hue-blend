@@ -13,22 +13,18 @@ interface ProcessEnv {
 	HUE_BRIDGE_CACERT_PEM_PATH: string;
 	HUE_BRIDGE_API_KEY: string;
 	HUE_BRIDGE_ID: string;
-	AUTOMATION_SCENE_ID: string;
 }
 const envSchema = Joi.object<ProcessEnv>({
 	HUE_BRIDGE_BASE_URL: Joi.string().required(),
 	HUE_BRIDGE_CACERT_PEM_PATH: Joi.string().required(),
 	HUE_BRIDGE_API_KEY: Joi.string().required(),
 	HUE_BRIDGE_ID: Joi.string().required(),
-	AUTOMATION_SCENE_ID: Joi.string().required(),
 });
 const { error, value: processEnv } = envSchema.validate(
 	process.env, { allowUnknown: true});
 if (error) {
 	throw error;
 }
-
-type Unimplemented = unknown;
 
 interface Resource {
 	rid: string,
@@ -69,32 +65,6 @@ interface GroupedLights {
 	owner: Resource,
 }
 
-interface Action {
-	on: { on: boolean },
-	dimming?: { brightness: number },
-	color?: { xy: { x: number, y: number }},
-	color_temperature?: { mirek: number }, // between 153 and 500
-	gradient?: Unimplemented, 
-	effects?: Unimplemented,
-}
-
-interface ActionGet {
-	target: Resource,
-	action: Action,
-}
-
-interface SceneGet {
-	id: string,
-	id_v1: string,
-	actions: ActionGet[],
-	metadata: Metadata,
-	group: Resource,
-	palette: Unimplemented,
-	speed: Unimplemented,
-	auto_dynamic: Unimplemented,
-	status: { active: "inactive" | "static" | "dynamic_palette" },
-}
-
 interface LightBody {
 	errors: Error[],
 	data: LightData[],
@@ -103,11 +73,6 @@ interface LightBody {
 export interface GroupBody {
 	errors: Error[],
 	data: Group[],
-}
-
-interface SceneBody {
-	errors: Error[],
-	data: SceneGet[],
 }
 
 interface GenericBody {
@@ -149,12 +114,6 @@ export async function getGroupedLights() {
 
 function getRids(group: Group): string[] {
 	return _.map(group.children, resource => resource.rid);
-}
-
-function getLightsOn(lights: LightBody): _.Collection<string> {
-	return _(lights.data)
-		.filter((light: LightData) => light.on.on)
-		.map(light => light.id);
 }
 
 function getLightsOnInGroup(lights: LightBody, rids: string[]): LightData[] {
@@ -208,29 +167,6 @@ export async function updateColor(groupName: string, mirek: number, brightness: 
 		},
 	});
 	return response.data as GenericBody;
-}
-
-export async function updateColorScene(mirek: number, brightness: number, duration: number) {
-	console.log(`Updating color, mirek: ${mirek}, brightness: ${brightness}`);
-	const lights = await getLights();
-	const lightsOnRids = getLightsOn(lights);
-
-	const automationScene = await getAutomationScene();
-	automationScene.data = automationScene.data.map(scene => {
-		scene.actions = scene.actions.map(action => {
-			action.action.on.on = lightsOnRids.includes(action.target.rid);
-			action.action.color_temperature = { mirek };
-			action.action.dimming = { brightness: 100 };
-			return action;
-		});
-		return scene;
-	});
-	for (const sceneGet of automationScene.data) {
-		const requestData = { actions: sceneGet.actions };
-		await updateAutomationScene(requestData);
-	}
-
-	await activateAutomationScene(duration, brightness);
 }
 
 export enum GroupChange {
@@ -296,88 +232,12 @@ export async function setGroup(groupName: string, change: GroupChange, mirek?: n
 	return response.data as GenericBody;
 }
 
-export async function setGroupScene(groupName: string, change: GroupChange) {
-	const state = await State.getInstance();
-	const groupLights = state.getGroup(groupName);
-	const groupRids = getRids(groupLights);
-	const lights = await getLights();
-	const lightsOnInGroup = getLightsOnInGroup(lights, groupRids);
-	let turnOn = false;
-	switch(change) {
-		case GroupChange.ON:
-			turnOn = true;
-			break;
-		case GroupChange.OFF:
-			turnOn = false;
-			break;
-		case GroupChange.TOGGLE:
-			turnOn = lightsOnInGroup.length === 0;
-			break;
-		default:
-			throw(new Error(`Unexpected change type: ${change}`));
-	}
-	console.log(`Toggling group "${groupName}" to ${(turnOn? "on": "off")}`);
-
-	const automationScene = await getAutomationScene();
-	automationScene.data = automationScene.data.map(scene => {
-		scene.actions = scene.actions.map(action => {
-			if (_.includes(groupRids, action.target.rid)) {
-				action.action.on.on = turnOn;
-			}
-			// action.action.color_temperature = { mirek: 233 }; // Not necessary to update
-			// action.action.dimming = { brightness: 100 }
-
-			return action;
-		});
-		return scene;
-	});
-	for (const sceneGet of automationScene.data) {
-		const requestData = { actions: sceneGet.actions };
-		await updateAutomationScene(requestData);
-	}
-	await activateAutomationScene(1000, 100);
-}
-
 export async function getLights(): Promise<LightBody> {
 	const response = await hueRequest({
 		method: "get",
 		url: `${processEnv.HUE_BRIDGE_BASE_URL}/clip/v2/resource/light`,
 	});
 	return response.data as LightBody;
-}
-
-export async function getAutomationScene(): Promise<SceneBody> {
-	const response = await hueRequest({
-		method: "get",
-		url: `${processEnv.HUE_BRIDGE_BASE_URL}/clip/v2/resource/scene/${processEnv.AUTOMATION_SCENE_ID}`,
-	});
-	return response.data as SceneBody;
-}
-
-export async function updateAutomationScene(sceneGet: Unimplemented): Promise<GenericBody> {
-	const response = await hueRequest({
-		method: "put",
-		url: `${processEnv.HUE_BRIDGE_BASE_URL}/clip/v2/resource/scene/${processEnv.AUTOMATION_SCENE_ID}`,
-		data: sceneGet,
-	});
-	return response.data as GenericBody;
-}
-
-export async function activateAutomationScene(duration: number, brightness: number): Promise<GenericBody> {
-	const response = await hueRequest({
-		method: "put",
-		url: `${processEnv.HUE_BRIDGE_BASE_URL}/clip/v2/resource/scene/${processEnv.AUTOMATION_SCENE_ID}`,
-		data: {
-			recall: {
-				action: "active",
-				duration, // Gradient transition time in ms
-				dimming: {
-					brightness, // Scene global brightness
-				},
-			},
-		},
-	});
-	return response.data as GenericBody;
 }
 
 const rateLimitedHueRequester = (function() {
