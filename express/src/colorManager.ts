@@ -3,6 +3,7 @@ import Joi from "joi";
 import axios from "axios";
 import cron from "node-cron";
 import { updateColor } from "./hue";
+import { State } from "./state";
 
 interface ProcessEnv {
 	RUST_HUE_URL: string,
@@ -48,7 +49,7 @@ interface ChangeActionColor {
 	color: MirekBrightness,
 }
 
-interface NowChange {
+export interface NowChange {
 	now: string,
 	change_action: ChangeActionColor | "none",
 	just_updated: boolean,
@@ -79,6 +80,10 @@ async function getNowChange(): Promise<NowChange> {
 
 async function getAndApplyChange() {
 	let nowChange = await getNowChange();
+
+	let state = await State.getInstance();
+	state.lastChange = nowChange;
+
 	if (nowChange.change_action === "none" ) {
 		console.log("No change to be made.")
 		return;

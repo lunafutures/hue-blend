@@ -1,10 +1,13 @@
 import _ from "lodash";
 import { Group, GroupBody, IndividualDictionary, getGroupedLights, getLights, getRooms, getZones } from "./hue";
+import { NowChange } from "./colorManager";
 
 export class State {
 	private zones?: GroupBody;
 	private rooms?: GroupBody;
 	private groups: IndividualDictionary;
+
+	private _lastChange?: NowChange;
 
 	private static instancePromise: Promise<State>;
 
@@ -45,6 +48,14 @@ export class State {
 		}
 
 		return State.instancePromise;
+	}
+
+	get lastChange(): NowChange | undefined {
+		return this._lastChange;
+	}
+
+	set lastChange(value: NowChange) {
+		this._lastChange = value;
 	}
 
 	getGroup(groupName: string): Group {
