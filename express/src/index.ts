@@ -6,6 +6,7 @@ import Joi from "joi"
 
 import { GroupChange, setGroup, updateColor } from "./hue";
 import { startPeriodicUpdate } from "./colorManager";
+import { State } from "./state";
 
 interface ProcessEnv {
 	EXPRESS_PORT: number,
@@ -106,6 +107,14 @@ app.put('/set-dark', async (req: express.Request, res: express.Response) => {
 	} catch(error) {
 		handleErrorResponse(error as Error, res);
 	}
+});
+
+app.get('/debug', async (_req: express.Request, res: express.Response) => {
+	const state = await State.getInstance();
+	res.json({ 
+		now: new Date(),
+		state,
+	});
 });
 
 app.get('/', (_req: express.Request, res: express.Response) => {
