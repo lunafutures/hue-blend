@@ -15,7 +15,6 @@ test('Validate now change with mirek and brightness', () => {
 		"just_updated": false
 	}`;
 	const { error, value: nowChange } = nowChangeSchema.validate(JSON.parse(input));
-	console.log("error =", error);
 	expect(error).toBeUndefined();
 
 	const expectedNowChange: NowChange = {

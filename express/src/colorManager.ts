@@ -5,6 +5,7 @@ import cron from "node-cron";
 import { updateColor } from "./hue";
 import { State } from "./state";
 import { EnvValidator } from "./envValidator";
+import { logger } from "./logging";
 
 interface ProcessEnv {
 	RUST_HUE_URL: string,
@@ -56,20 +57,21 @@ async function getNowChange(): Promise<NowChange> {
 }
 
 async function getAndApplyChange() {
+	logger.info("Applying periodic change...");
 	const nowChange = await getNowChange();
 
 	const state = await State.getInstance();
 	state.lastChange = nowChange;
 
 	if (nowChange.change_action === "none" ) {
-		console.log("No change to be made.")
+		logger.debug("Change action is none. Nothing to change.")
 		return;
 	}
 	const changeColor = nowChange.change_action.color;
 	await updateColor(
 		env.getProperty('HUE_ALL_LIGHTS_GROUP_NAME'),
 		changeColor.mirek,
-		changeColor.brightness); // XXX committed value is not exact, but should be within 1
+		changeColor.brightness);
 }
 
 export function startPeriodicUpdate() {

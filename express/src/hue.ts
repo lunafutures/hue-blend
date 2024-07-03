@@ -8,6 +8,7 @@ import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
 import rateLimit from 'axios-rate-limit';
 import { State } from "./state";
 import { EnvValidator } from "./envValidator";
+import { logger } from "./logging";
 
 interface ProcessEnv {
 	HUE_BRIDGE_BASE_URL: string;
@@ -95,20 +96,20 @@ function noLightsDeviate(lights: LightBody, rids: string[], desiredMirek: number
 	return _.every(getLightsOnInGroup(lights, rids), (onLight: LightData) => {
 		const mirek = onLight.color_temperature?.mirek;
 		if (mirek === undefined) {
-			console.log("Deviation: mirek is undefined");
+			logger.debug(`Deviation: mirek on lightId=${onLight.id} is undefined.`);
 			return false;
 		} else if (mirek != desiredMirek) {
-			console.log(`Deviation: mirek differs: mirek (${mirek}) != desiredMirek (${desiredMirek})`);
+			logger.debug(`Deviation: mirek=${mirek} of lightId=${onLight.id} != desiredMirek=${desiredMirek}.`);
 			return false;
 		}
 
 		const brightness = onLight.dimming?.brightness;
 		if (brightness === undefined) {
-			console.log("Deviation: brightness is undefined");
+			logger.debug(`Deviation: brightness on lightId=${onLight.id} is undefined.`);
 			return false;
 		} else if (Math.abs(brightness - desiredBrightnessInexact) > ALLOWED_BRIGHTNESS_DIFF) {
-			console.log(`Deviation: brightness differs: brightness (${brightness}) ` +
-				`!= desiredbrightnessInexact (${desiredBrightnessInexact}) by more than ${ALLOWED_BRIGHTNESS_DIFF}`);
+			logger.debug(`Deviation: brightness=${brightness} of lightId=${onLight.id}` +
+				`!= desiredbrightnessInexact=${desiredBrightnessInexact} by more than ${ALLOWED_BRIGHTNESS_DIFF}.`);
 			return false;
 		}
 
@@ -121,11 +122,11 @@ function getRids(group: Group): string[] {
 }
 
 export async function updateColor(groupName: string, mirek: number, brightness: number) {
-	console.log(`\nUpdating color: mirek=${mirek} brightness=${brightness}`);
+	logger.info(`Updating color: mirek=${mirek} brightness=${brightness}.`);
 
 	const state = await State.getInstance();
 	if (noLightsDeviate(await getLights(), getRids(state.getGroup(groupName)), mirek, brightness)) {
-		console.log("Not updating lights because no lights deviate.");
+		logger.debug("Not updating lights because no lights deviate.");
 		return;
 	}
 
@@ -222,17 +223,18 @@ export async function setGroup(groupName: string, change: GroupChange, mirek?: n
 			mirek ?? changeAction.color.mirek,
 			brightness ?? changeAction.color.brightness);
 
-	console.log(`Setting group "${groupName}": ${onOn} ${mirekBrightnessConfig}`);
+	const data = {
+			type: "grouped_light",
+			...onOn,
+			...mirekBrightnessConfig,
+	};
+	logger.debug(`Setting group on "${groupName}": ${JSON.stringify(data)}.`);
 
 	const group = state.getGroup(groupName);
 	const response = await hueRequest({
 		method: "put",
 		url: `${env.getProperty('HUE_BRIDGE_BASE_URL')}/clip/v2/resource/grouped_light/${group.id}`,
-		data: {
-			type: "grouped_light",
-			...onOn,
-			...mirekBrightnessConfig,
-		},
+		data,
 	});
 	return response.data as GenericBody;
 }

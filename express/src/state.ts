@@ -1,6 +1,7 @@
 import _ from "lodash";
 import { Group, GroupBody, IndividualDictionary, getGroupedLights, getRooms, getZones } from "./hue";
 import { NowChange } from "./colorManager";
+import { logger } from "./logging";
 
 export class State {
 	private zones?: GroupBody;
@@ -29,16 +30,16 @@ export class State {
 		this.zones.data.forEach(group => {
 			this.groups[group.metadata.name] = group;
 			const rid = this.groups[group.metadata.name].rid = group.id;
-			const gid = this.groups[group.metadata.name].id = groupRidToId[rid];
-			console.log(`Found zone: ${group.metadata.name} (rid: ${group.rid}, id: ${gid}).`);
+			this.groups[group.metadata.name].id = groupRidToId[rid];
+			logger.debug(`Found zone: ${group.metadata.name}.`);
 		});
 
 		this.rooms = await getRooms();
 		this.rooms.data.forEach(group => {
 			this.groups[group.metadata.name] = group;
 			const rid = this.groups[group.metadata.name].rid = group.id;
-			const gid = this.groups[group.metadata.name].id = groupRidToId[rid];
-			console.log(`Found room: ${group.metadata.name} (rid: ${group.rid}, id: ${gid}).`);
+			this.groups[group.metadata.name].id = groupRidToId[rid];
+			logger.debug(`Found room: ${group.metadata.name}.`);
 		});
 	}
 

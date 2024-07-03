@@ -21,6 +21,7 @@ const envSchema = Joi.object<ProcessEnv>({
 const env = new EnvValidator<ProcessEnv>(envSchema);
 
 function handleErrorResponse(error: Error, res: express.Response): void {
+	logger.error(`${error.message}`);
 	res.statusCode = 400;
 	res.json({ error: { name: error.name, message: error.message } });
 }
@@ -36,7 +37,7 @@ function throwableValidation<T>(obj: object, schema: Joi.ObjectSchema<T>): T {
 const app = express();
 app.use(express.json());
 
-app.use((req: express.Request, res: express.Response, next) => {
+app.use((req: express.Request, _res: express.Response, next) => {
 	logger.info(`${req.method} ${req.url}`);
 	next();
 });
@@ -113,18 +114,33 @@ app.put('/set-dark', async (req: express.Request, res: express.Response) => {
 });
 
 app.get('/debug', async (_req: express.Request, res: express.Response) => {
-	const state = await State.getInstance();
-	res.json({ 
-		now: new Date(),
-		state,
-	});
+	try {
+		const state = await State.getInstance();
+		res.json({
+			now: new Date(),
+			state,
+		});
+	} catch (error) {
+		handleErrorResponse(error as Error, res);
+	}
 });
 
 app.get('/', (_req: express.Request, res: express.Response) => {
-	res.json({ up: true });
+	try {
+		res.json({ up: true });
+	} catch (error) {
+		handleErrorResponse(error as Error, res);
+	}
+});
+
+app.use((err: Error, _req: unknown, res: express.Response, _next: unknown): void => {
+	logger.error(`${err.message}`);
+	res.status(400).json({ error: err.message });
+
+	res.json({ error: { name: error.name, message: error.message } });
 });
 
 startPeriodicUpdate();
 app.listen(env.getProperty('EXPRESS_PORT'), () => {
-	console.log(`hue-express app listening on port ${env.getProperty('EXPRESS_PORT')}`);
+	logger.info(`Express is listening on port ${env.getProperty('EXPRESS_PORT')}`);
 });
