@@ -8,6 +8,7 @@ import { GroupChange, setGroup, updateColor } from "./hue";
 import { startPeriodicUpdate } from "./colorManager";
 import { State } from "./state";
 import { EnvValidator } from "./envValidator";
+import { logger } from "./logging";
 
 interface ProcessEnv {
 	EXPRESS_PORT: number,
@@ -34,6 +35,11 @@ function throwableValidation<T>(obj: object, schema: Joi.ObjectSchema<T>): T {
 
 const app = express();
 app.use(express.json());
+
+app.use((req: express.Request, res: express.Response, next) => {
+	logger.info(`${req.method} ${req.url}`);
+	next();
+});
 
 interface UpdateColorBody {
 	mirek: number,
