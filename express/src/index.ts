@@ -26,7 +26,7 @@ function handleErrorResponse(error: Error, res: express.Response): void {
 	res.json({ error: { name: error.name, message: error.message } });
 }
 
-function throwableValidation<T>(obj: Object, schema: Joi.ObjectSchema<T>): T {
+function throwableValidation<T>(obj: object, schema: Joi.ObjectSchema<T>): T {
 	const { error, value } = schema.validate(obj);
 	if (error) {
 		throw error;

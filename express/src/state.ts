@@ -1,5 +1,5 @@
 import _ from "lodash";
-import { Group, GroupBody, IndividualDictionary, getGroupedLights, getLights, getRooms, getZones } from "./hue";
+import { Group, GroupBody, IndividualDictionary, getGroupedLights, getRooms, getZones } from "./hue";
 import { NowChange } from "./colorManager";
 
 export class State {
@@ -59,7 +59,7 @@ export class State {
 	}
 
 	getGroup(groupName: string): Group {
-		if (!this.groups.hasOwnProperty(groupName)) {
+		if (!Object.prototype.hasOwnProperty.call(this.groups, groupName)) {
 			throw new Error(`Group "${groupName}" not found in the object.`);
 		}
 

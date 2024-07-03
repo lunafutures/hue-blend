@@ -401,7 +401,7 @@ const rateLimitedHueRequester = (function() {
 	}), { maxRequests: 1, perMilliseconds: 100 });
 })();
 
-function hueRequest<D>(config: Partial<AxiosRequestConfig<D>>): Promise<AxiosResponse<any, any>> {
+function hueRequest<T, D>(config: Partial<AxiosRequestConfig<D>>): Promise<AxiosResponse<T, D>> {
 	config.headers = {
 		"hue-application-key": apiKey,
 		...config.headers,
