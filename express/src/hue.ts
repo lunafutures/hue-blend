@@ -27,11 +27,6 @@ const { error, value: processEnv } = envSchema.validate(
 if (error) {
 	throw error;
 }
-const hueBridgeBaseUrl = processEnv.HUE_BRIDGE_BASE_URL; // XXX
-const hueBridgeCertPath = processEnv.HUE_BRIDGE_CACERT_PEM_PATH;
-const apiKey = processEnv.HUE_BRIDGE_API_KEY;
-const bridgeId = processEnv.HUE_BRIDGE_ID;
-const automationSceneId = processEnv.AUTOMATION_SCENE_ID;
 
 type Unimplemented = unknown;
 
@@ -137,17 +132,17 @@ async function getGroups(url: string): Promise<GroupBody> {
 }
 
 export function getZones() {
-	return getGroups(`${hueBridgeBaseUrl}/clip/v2/resource/zone`);
+	return getGroups(`${processEnv.HUE_BRIDGE_BASE_URL}/clip/v2/resource/zone`);
 }
 
 export function getRooms() {
-	return getGroups(`${hueBridgeBaseUrl}/clip/v2/resource/room`);
+	return getGroups(`${processEnv.HUE_BRIDGE_BASE_URL}/clip/v2/resource/room`);
 }
 
 export async function getGroupedLights() {
 	const response = await hueRequest({
 		method: "get",
-		url: `${hueBridgeBaseUrl}/clip/v2/resource/grouped_light`,
+		url: `${processEnv.HUE_BRIDGE_BASE_URL}/clip/v2/resource/grouped_light`,
 	});
 	return response.data as HueResponse<GroupedLights>;
 }
@@ -205,7 +200,7 @@ export async function updateColor(groupName: string, mirek: number, brightness: 
 	const group = state.getGroup(groupName);
 	const response = await hueRequest({
 		method: "put",
-		url: `${hueBridgeBaseUrl}/clip/v2/resource/grouped_light/${group.id}`,
+		url: `${processEnv.HUE_BRIDGE_BASE_URL}/clip/v2/resource/grouped_light/${group.id}`,
 		data: {
 			type: "grouped_light",
 			dimming: { brightness },
@@ -291,7 +286,7 @@ export async function setGroup(groupName: string, change: GroupChange, mirek?: n
 	const group = state.getGroup(groupName);
 	const response = await hueRequest({
 		method: "put",
-		url: `${hueBridgeBaseUrl}/clip/v2/resource/grouped_light/${group.id}`,
+		url: `${processEnv.HUE_BRIDGE_BASE_URL}/clip/v2/resource/grouped_light/${group.id}`,
 		data: {
 			type: "grouped_light",
 			...onOn,
@@ -346,7 +341,7 @@ export async function setGroupScene(groupName: string, change: GroupChange) {
 export async function getLights(): Promise<LightBody> {
 	const response = await hueRequest({
 		method: "get",
-		url: `${hueBridgeBaseUrl}/clip/v2/resource/light`,
+		url: `${processEnv.HUE_BRIDGE_BASE_URL}/clip/v2/resource/light`,
 	});
 	return response.data as LightBody;
 }
@@ -354,7 +349,7 @@ export async function getLights(): Promise<LightBody> {
 export async function getAutomationScene(): Promise<SceneBody> {
 	const response = await hueRequest({
 		method: "get",
-		url: `${hueBridgeBaseUrl}/clip/v2/resource/scene/${automationSceneId}`,
+		url: `${processEnv.HUE_BRIDGE_BASE_URL}/clip/v2/resource/scene/${processEnv.AUTOMATION_SCENE_ID}`,
 	});
 	return response.data as SceneBody;
 }
@@ -362,7 +357,7 @@ export async function getAutomationScene(): Promise<SceneBody> {
 export async function updateAutomationScene(sceneGet: Unimplemented): Promise<GenericBody> {
 	const response = await hueRequest({
 		method: "put",
-		url: `${hueBridgeBaseUrl}/clip/v2/resource/scene/${automationSceneId}`,
+		url: `${processEnv.HUE_BRIDGE_BASE_URL}/clip/v2/resource/scene/${processEnv.AUTOMATION_SCENE_ID}`,
 		data: sceneGet,
 	});
 	return response.data as GenericBody;
@@ -371,7 +366,7 @@ export async function updateAutomationScene(sceneGet: Unimplemented): Promise<Ge
 export async function activateAutomationScene(duration: number, brightness: number): Promise<GenericBody> {
 	const response = await hueRequest({
 		method: "put",
-		url: `${hueBridgeBaseUrl}/clip/v2/resource/scene/${automationSceneId}`,
+		url: `${processEnv.HUE_BRIDGE_BASE_URL}/clip/v2/resource/scene/${processEnv.AUTOMATION_SCENE_ID}`,
 		data: {
 			recall: {
 				action: "active",
@@ -388,7 +383,7 @@ export async function activateAutomationScene(duration: number, brightness: numb
 const rateLimitedHueRequester = (function() {
 	// Allows not specifying "rejectUnauthorized: false"
 	const httpsAgent = new https.Agent({
-		ca: fs.readFileSync(hueBridgeCertPath),
+		ca: fs.readFileSync(processEnv.HUE_BRIDGE_CACERT_PEM_PATH),
 		checkServerIdentity: (hostname, cert) => {
 			const tlsResult = tls.checkServerIdentity(hostname, cert);
 			if (tlsResult === undefined) {
@@ -400,7 +395,7 @@ const rateLimitedHueRequester = (function() {
 				return tlsResult;
 			}
 
-			if (cert.subject.CN === bridgeId.toLowerCase()) {
+			if (cert.subject.CN === processEnv.HUE_BRIDGE_ID.toLowerCase()) {
 				return undefined;
 			}
 			
@@ -416,7 +411,7 @@ const rateLimitedHueRequester = (function() {
 
 function hueRequest<T, D>(config: Partial<AxiosRequestConfig<D>>): Promise<AxiosResponse<T, D>> {
 	config.headers = {
-		"hue-application-key": apiKey,
+		"hue-application-key": processEnv.HUE_BRIDGE_API_KEY,
 		...config.headers,
 	};
 
