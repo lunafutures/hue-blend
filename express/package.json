@@ -11,8 +11,7 @@
     "test": "jest",
     "webpack": "webpack",
     "start-bundle": "webpack && node dist/bundle.js",
-    "build": "bash build.sh",
-    "buildx-arm": "docker buildx build -t hue-express:arm-1.0 --platform linux/arm64 --output=type=docker ."
+    "build": "bash build.sh"
   },
   "author": "",
   "license": "ISC",
