@@ -51,6 +51,8 @@ interface LightData {
 	owner: Resource,
 	metadata: Metadata,
 	on: { on: boolean },
+	color_temperature?: { mirek: number }, // between 153 and 500
+	dimming?: { brightness: number },
 	type: "light",
 }
 
@@ -165,11 +167,41 @@ function getLightsOnInGroup(lights: LightBody, rids: string[]): LightData[] {
 		_.includes(rids, light.id) && light.on.on === true);
 }
 
+const ALLOWED_BRIGHTNESS_DIFF = 1.0;
+function noLightsDeviate(lights: LightBody, rids: string[], desiredMirek: number, desiredBrightnessInexact: number): boolean {
+	return _.every(getLightsOnInGroup(lights, rids), (onLight: LightData) => {
+		const mirek = onLight.color_temperature?.mirek;
+		if (mirek === undefined) {
+			console.log("Deviation: mirek is undefined");
+			return false;
+		} else if (mirek != desiredMirek) {
+			console.log(`Deviation: mirek differs: mirek (${mirek}) != desiredMirek (${desiredMirek})`);
+			return false;
+		}
+
+		const brightness = onLight.dimming?.brightness;
+		if (brightness === undefined) {
+			console.log("Deviation: brightness is undefined");
+			return false;
+		} else if (Math.abs(brightness - desiredBrightnessInexact) > ALLOWED_BRIGHTNESS_DIFF) {
+			console.log(`Deviation: brightness differs: brightness (${brightness}) ` +
+				`!= desiredbrightnessInexact (${desiredBrightnessInexact}) by more than ${ALLOWED_BRIGHTNESS_DIFF}`);
+			return false;
+		}
+
+		return true;
+	});
+}
+
 export async function updateColor(groupName: string, mirek: number, brightness: number) {
-	console.log(`Updating color: mirek=${mirek} brightness=${brightness}`);
-	// TODO XXX: Check grouped light color before updating
+	console.log(`\nUpdating color: mirek=${mirek} brightness=${brightness}`);
 
 	const state = await State.getInstance();
+	if (noLightsDeviate(await getLights(), getRids(state.getGroup(groupName)), mirek, brightness)) {
+		console.log("Not updating lights because no lights deviate.");
+		return;
+	}
+
 	const group = state.getGroup(groupName);
 	const response = await hueRequest({
 		method: "put",
