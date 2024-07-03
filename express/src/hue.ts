@@ -6,6 +6,7 @@ import _ from "lodash";
 import Joi from "joi";
 import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
 import rateLimit from 'axios-rate-limit';
+import { State } from "./state";
 
 interface ProcessEnv {
 	HUE_BRIDGE_BASE_URL: string;
@@ -26,7 +27,7 @@ const { error, value: processEnv } = envSchema.validate(
 if (error) {
 	throw error;
 }
-const hueBridgeBaseUrl = processEnv.HUE_BRIDGE_BASE_URL;
+const hueBridgeBaseUrl = processEnv.HUE_BRIDGE_BASE_URL; // XXX
 const hueBridgeCertPath = processEnv.HUE_BRIDGE_CACERT_PEM_PATH;
 const apiKey = processEnv.HUE_BRIDGE_API_KEY;
 const bridgeId = processEnv.HUE_BRIDGE_ID;
@@ -57,7 +58,7 @@ interface Error {
 	description: String,
 }
 
-interface Group {
+export interface Group {
 	id: string,
 	rid: string,
 	children: Resource[],
@@ -102,7 +103,7 @@ interface LightBody {
 	data: LightData[],
 }
 
-interface GroupBody {
+export interface GroupBody {
 	errors: Error[],
 	data: Group[],
 }
@@ -121,68 +122,8 @@ interface HueResponse<T> {
 	errors: Error[],
 }
 
-type IndividualDictionary = {
+export type IndividualDictionary = {
 	[key: string]: Group;
-}
-
-export class State {
-	private zones: GroupBody | undefined;
-	private rooms: GroupBody | undefined;
-	private groups: IndividualDictionary;
-
-	constructor() {
-		this.groups = {};
-		this.populateGroups();
-	}
-
-	async populateGroups() {
-		const groupedLights = await getGroupedLights();
-		const groupRidToId = _.fromPairs(_.map(groupedLights.data, item => [item.owner.rid, item.id]));
-
-		this.zones = await getZones();
-		this.zones.data.forEach(group => {
-			this.groups[group.metadata.name] = group;
-			const rid = this.groups[group.metadata.name].rid = group.id;
-			const gid = this.groups[group.metadata.name].id = groupRidToId[rid];
-			console.log(`Found zone: ${group.metadata.name} (rid: ${group.rid}, id: ${gid}).`);
-		});
-
-		this.rooms = await getRooms();
-		this.rooms.data.forEach(group => {
-			this.groups[group.metadata.name] = group;
-			const rid = this.groups[group.metadata.name].rid = group.id;
-			const gid = this.groups[group.metadata.name].id = groupRidToId[rid];
-			console.log(`Found room: ${group.metadata.name} (rid: ${group.rid}, id: ${gid}).`);
-		});
-	}
-
-	getGroup(groupName: string): Group {
-		if (!this.groups.hasOwnProperty(groupName)) {
-			throw new Error(`Group "${groupName}" not found in the object.`);
-		}
-
-		return this.groups[groupName];
-	}
-
-	async testLights() {
-		const lights = await getLights();
-		lights.data.forEach((light, i) => {
-			console.log(i, light.metadata.name, light.on.on)
-		});
-	}
-
-	async test() {
-		console.log("groups:", this.groups);
-		Object.keys(this.groups).forEach(key => {
-			const group = this.groups[key];
-			console.log(group.metadata.name, group.children.length);
-		});
-	}
-}
-export async function createState(): Promise<State> {
-	const state = new State();
-	await state.populateGroups();
-	return state;
 }
 
 async function getGroups(url: string): Promise<GroupBody> {
@@ -193,15 +134,15 @@ async function getGroups(url: string): Promise<GroupBody> {
 	return response.data as GroupBody;
 }
 
-function getZones() {
+export function getZones() {
 	return getGroups(`${hueBridgeBaseUrl}/clip/v2/resource/zone`);
 }
 
-function getRooms() {
+export function getRooms() {
 	return getGroups(`${hueBridgeBaseUrl}/clip/v2/resource/room`);
 }
 
-async function getGroupedLights() {
+export async function getGroupedLights() {
 	const response = await hueRequest({
 		method: "get",
 		url: `${hueBridgeBaseUrl}/clip/v2/resource/grouped_light`,
@@ -227,8 +168,9 @@ function getLightsOnInGroup(lights: LightBody, rids: string[]): LightData[] {
 export async function updateColor(groupName: string, mirek: number, brightness: number) {
 	console.log(`Updating color: mirek=${mirek} brightness=${brightness}`);
 	// TODO XXX: Check grouped light color before updating
-	
-	const group = (await state).getGroup(groupName);
+
+	const state = await State.getInstance();
+	const group = state.getGroup(groupName);
 	const response = await hueRequest({
 		method: "put",
 		url: `${hueBridgeBaseUrl}/clip/v2/resource/grouped_light/${group.id}`,
@@ -287,9 +229,10 @@ function getOnOn(groupChange: GroupChange, numLightsOn: number): OnOn {
 }
 
 export async function setGroup(groupName: string, change: GroupChange, mirek?: number, brightness?: number) {
+	const state = await State.getInstance();
 	const lightsOnInGroup = getLightsOnInGroup(
 		await getLights(),
-		getRids((await state).getGroup(groupName)));
+		getRids(state.getGroup(groupName)));
 	let onOn = getOnOn(change, lightsOnInGroup.length);
 
 	let mirekConfig = mirek === undefined ? {} :
@@ -299,7 +242,7 @@ export async function setGroup(groupName: string, change: GroupChange, mirek?: n
 
 	console.log(`Setting group "${groupName}": ${onOn} ${brightnessConfig} ${mirekConfig}`);
 
-	const group = (await state).getGroup(groupName);
+	const group = state.getGroup(groupName);
 	const response = await hueRequest({
 		method: "put",
 		url: `${hueBridgeBaseUrl}/clip/v2/resource/grouped_light/${group.id}`,
@@ -314,7 +257,8 @@ export async function setGroup(groupName: string, change: GroupChange, mirek?: n
 }
 
 export async function setGroupScene(groupName: string, change: GroupChange) {
-	const groupLights = (await state).getGroup(groupName);
+	const state = await State.getInstance();
+	const groupLights = state.getGroup(groupName);
 	const groupRids = getRids(groupLights);
 	const lights = await getLights();
 	const lightsOnInGroup = getLightsOnInGroup(lights, groupRids);
@@ -435,5 +379,3 @@ function hueRequest<D>(config: Partial<AxiosRequestConfig<D>>): Promise<AxiosRes
 		...config,
 	});
 }
-
-const state = createState();
