@@ -7,6 +7,7 @@ import Joi from "joi"
 import { GroupChange, setGroup, updateColor } from "./hue";
 import { startPeriodicUpdate } from "./colorManager";
 import { State } from "./state";
+import { EnvValidator } from "./envValidator";
 
 interface ProcessEnv {
 	EXPRESS_PORT: number,
@@ -16,11 +17,7 @@ const envSchema = Joi.object<ProcessEnv>({
 	EXPRESS_PORT: Joi.number().min(0).required(),
 	HUE_ALL_LIGHTS_GROUP_NAME: Joi.string().required(),
 });
-const { error, value: processEnv } = envSchema.validate(
-	process.env, { allowUnknown: true});
-if (error) {
-	throw error;
-}
+const env = new EnvValidator<ProcessEnv>(envSchema);
 
 function handleErrorResponse(error: Error, res: express.Response): void {
 	res.statusCode = 400;
@@ -49,7 +46,7 @@ const updateColorSchema = Joi.object<UpdateColorBody>({
 app.put('/update-color', async (req: express.Request, res: express.Response) => {
 	try {
 		const { mirek, brightness } = throwableValidation<UpdateColorBody>(req.body, updateColorSchema);
-		await updateColor(processEnv.HUE_ALL_LIGHTS_GROUP_NAME, mirek, brightness);
+		await updateColor(env.getProperty('HUE_ALL_LIGHTS_GROUP_NAME'), mirek, brightness);
 		res.json({})
 	} catch(error) {
 		handleErrorResponse(error as Error, res);
@@ -122,7 +119,6 @@ app.get('/', (_req: express.Request, res: express.Response) => {
 });
 
 startPeriodicUpdate();
-
-app.listen(processEnv.EXPRESS_PORT, () => {
-	console.log(`hue-express app listening on port ${processEnv.EXPRESS_PORT}`);
+app.listen(env.getProperty('EXPRESS_PORT'), () => {
+	console.log(`hue-express app listening on port ${env.getProperty('EXPRESS_PORT')}`);
 });
