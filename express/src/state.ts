@@ -2,11 +2,11 @@ import _ from "lodash";
 import { Group, GroupBody, IndividualDictionary, getGroupedLights, getLights, getRooms, getZones } from "./hue";
 
 export class State {
-	private zones: GroupBody | undefined;
-	private rooms: GroupBody | undefined;
+	private zones?: GroupBody;
+	private rooms?: GroupBody;
 	private groups: IndividualDictionary;
 
-	private static instance: State;
+	private static instancePromise: Promise<State>;
 
 	private constructor() {
 		this.groups = {};
@@ -40,11 +40,11 @@ export class State {
 	}
 
 	static async getInstance(): Promise<State> {
-		if(!State.instance) {
-			State.instance = await this.initialize();
+		if(!State.instancePromise) {
+			State.instancePromise = this.initialize();
 		}
 
-		return State.instance;
+		return State.instancePromise;
 	}
 
 	getGroup(groupName: string): Group {
