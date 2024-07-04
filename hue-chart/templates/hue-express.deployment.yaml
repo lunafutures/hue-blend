@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hue-express
+  namespace: default
+  labels:
+    app: hue-express
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hue-express
+  template:
+    metadata:
+      labels:
+        app: hue-express
+    spec:
+      containers:
+        - name: hue-express-container
+          image: {{ .Values.hosts.registry }}/hue-express:arm-latest
+          ports:
+            - containerPort: 3000
+              name: rocket-port
+          envFrom:
+            - secretRef:
+                name: hue-express-secret
+          env:
+            - name: EXPRESS_PORT
+              value: "3000"
+            - name: HUE_BRIDGE_CACERT_PEM_PATH
+              value: /data/huebridge_cacert.pem
+          volumeMounts:
+            - name: hue-express-huebridge-cacert
+              mountPath: /data/
+          resources:
+            limits:
+              memory: "512Mi"
+              cpu: "100m"
+      volumes:
+        - name: hue-express-huebridge-cacert
+          secret:
+            secretName: hue-express-huebridge-cacert
+      imagePullSecrets:
+        - name: image-pull-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hue-express-service
+  namespace: default
+spec:
+  type: ClusterIP
+  selector:
+    app: hue-express
+  ports:
+  - port: 3000
+    targetPort: 3000

@@ -5,6 +5,8 @@ DO_NOT_USE/
 # XXX remove
 mirek/
 k8s/
+values.private.yaml
+helm-output.yaml
 
 # Python
 .venv/

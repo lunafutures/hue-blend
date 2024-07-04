@@ -1,0 +1,45 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: strip-hue
+  namespace: default
+spec:
+  stripPrefix:
+    prefixes:
+      - /hue
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: strip-rust
+  namespace: default
+spec:
+  stripPrefix:
+    prefixes:
+      - /rust
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: traefik-hue-express
+  namespace: default
+spec:
+  entryPoints:
+    - websecure
+  tls:
+    secretName: {{ .Values.tlsSecret }} # must be within the same namespace
+  routes:
+    - kind: Rule
+      match: PathPrefix(`/hue`) && Host(`{{ .Values.hosts.local }}`)
+      middlewares:
+        - name: strip-hue
+      services:
+        - name: hue-express-service
+          port: 3000
+    - kind: Rule
+      match: PathPrefix(`/rust`) && Host(`{{ .Values.hosts.local }}`)
+      middlewares:
+        - name: strip-rust
+      services:
+        - name: rust-hue-service
+          port: 8000
