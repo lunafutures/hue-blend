@@ -2,6 +2,10 @@
 private/
 DO_NOT_USE/
 
+# XXX remove
+mirek/
+k8s/
+
 # Python
 .venv/
 
