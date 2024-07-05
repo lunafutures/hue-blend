@@ -6,4 +6,18 @@ hosts:
   registry: example.com
   main: example.org
   local: 127.0.0.1
+
 tlsSecret:
+
+namespaces:
+  hue: default
+
+imageResources:
+  rust:
+    limits:
+      memory: "512Mi"
+      cpu: "100m"
+  hueExpress:
+    limits:
+      memory: "512Mi"
+      cpu: "100m"

@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: hue-express
-  namespace: default
+  namespace: {{ .Values.namespaces.hue }}
   labels:
     app: hue-express
 spec:
@@ -33,9 +33,7 @@ spec:
             - name: hue-express-huebridge-cacert
               mountPath: /data/
           resources:
-            limits:
-              memory: "512Mi"
-              cpu: "100m"
+            {{- .Values.imageResources.hueExpress | toYaml | nindent 12 }}
       volumes:
         - name: hue-express-huebridge-cacert
           secret:
@@ -47,7 +45,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: hue-express-service
-  namespace: default
+  namespace: {{ .Values.namespaces.hue }}
 spec:
   type: ClusterIP
   selector:

@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: rust-hue
-  namespace: default
+  namespace: {{ .Values.namespaces.hue }}
   labels:
     app: rust-hue
 spec:
@@ -28,9 +28,7 @@ spec:
             - name: rust-hue-schedule
               mountPath: /data/
           resources:
-            limits:
-              memory: "512Mi"
-              cpu: "100m"
+            {{- toYaml .Values.imageResources.rust | nindent 12 }}
       volumes:
         - name: rust-hue-schedule
           secret:
@@ -42,7 +40,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: rust-hue-service
-  namespace: default
+  namespace: {{ .Values.namespaces.hue }}
 spec:
   type: ClusterIP
   selector:

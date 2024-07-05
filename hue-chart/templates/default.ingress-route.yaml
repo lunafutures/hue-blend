@@ -2,7 +2,7 @@ apiVersion: traefik.containo.us/v1alpha1
 kind: Middleware
 metadata:
   name: strip-hue
-  namespace: default
+  namespace: {{ .Values.namespaces.hue }}
 spec:
   stripPrefix:
     prefixes:
@@ -12,7 +12,7 @@ apiVersion: traefik.containo.us/v1alpha1
 kind: Middleware
 metadata:
   name: strip-rust
-  namespace: default
+  namespace: {{ .Values.namespaces.hue }}
 spec:
   stripPrefix:
     prefixes:
@@ -22,7 +22,7 @@ apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
 metadata:
   name: traefik-hue-express
-  namespace: default
+  namespace: {{ .Values.namespaces.hue }}
 spec:
   entryPoints:
     - websecure
