@@ -13,3 +13,4 @@ rocket = { version = "0.5.1", features = ["json"] }
 sunrise = "1.0.1"
 serde_yaml = "0.9"
 anyhow = "1.0.86"
+log = "0.4.22"

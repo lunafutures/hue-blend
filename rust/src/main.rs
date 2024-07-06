@@ -1,6 +1,7 @@
 mod schedule;
 mod sunset;
 mod time;
+mod fairing;
 
 #[macro_use] extern crate rocket;
 
@@ -106,16 +107,13 @@ async fn force_update(state: &State<Arc<Mutex<Schedule>>>) -> Responses<ForceUpd
 
 #[launch]
 fn rocket() -> _ {
-    #[cfg(debug_assertions)] 
-    {
-        // Only read .env in non-release mode
-        match dotenvy::dotenv() {
-            Err(e) => println!("WARNING! .env NOT LOADED: {}", e),
-            Ok(_) => println!("Successfully loaded .env"),
-        };
-    }
+    match dotenvy::dotenv() {
+        Err(e) => println!("WARNING! .env NOT LOADED: {}", e),
+        Ok(_) => println!("Successfully loaded .env"),
+    };
 
     rocket::build()
+        .attach(fairing::AutoLogger)
         .manage(Arc::new(Mutex::new(Schedule::new().unwrap())))
         .mount("/", routes![index, get_debug_info, now, force_update])
 }
