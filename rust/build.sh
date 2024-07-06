@@ -9,19 +9,17 @@ else
 	echo VERSION=${VERSION}
 fi
 
+set -ex
 
 function debug() (
-	set -ex
 	docker-compose up --build
 )
 
 function buildx() (
-	set -ex
 	docker buildx build -t rust-hue:arm-${VERSION} --platform linux/arm64 --output=type=docker .
 )
 
 function publish() (
-	set -ex
 	docker tag rust-hue:arm-${VERSION} registry.blahblahblah.xyz/rust-hue:arm-${VERSION}
 	docker push registry.blahblahblah.xyz/rust-hue:arm-${VERSION}
 
@@ -30,7 +28,6 @@ function publish() (
 )
 
 function all() (
-	set -ex
 	cargo clippy --fix
 	cargo test
 	buildx
