@@ -1,4 +1,4 @@
-use chrono::{DateTime, Datelike, Local, TimeZone};
+use chrono::{DateTime, Datelike, TimeZone};
 use chrono_tz::Tz;
 use sunrise::sunrise_sunset;
 
