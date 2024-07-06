@@ -113,8 +113,8 @@ fn not_found_handler(_req: &rocket::Request) -> String {
 #[launch]
 fn rocket() -> _ {
     match dotenvy::dotenv() {
-        Err(e) => println!("WARNING! .env NOT LOADED: {}", e),
-        Ok(_) => println!("Successfully loaded .env"),
+        Err(e) => info!(".env NOT LOADED: {} (This could be intentional.)", e),
+        Ok(_) => info!("Successfully loaded .env"),
     };
 
     rocket::build()
