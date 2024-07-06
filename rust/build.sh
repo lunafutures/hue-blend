@@ -30,7 +30,8 @@ function publish() (
 )
 
 function all() (
-	cargo build
+	set -ex
+	cargo test
 	buildx
 	publish
 )
