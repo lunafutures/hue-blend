@@ -17,24 +17,24 @@ struct LocationConfig {
 
 #[derive(Debug, PartialEq, Clone, serde::Deserialize, serde::Serialize)]
 #[serde(crate = "rocket::serde", rename_all = "snake_case")]
-enum From {
+enum FromRefTime {
 	Sunset
 }
 
-impl fmt::Display for From {
+impl fmt::Display for FromRefTime {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", match *self {
-            From::Sunset => "sunset",
+            FromRefTime::Sunset => "sunset",
         })
     }
 }
 
-impl FromStr for From {
+impl FromStr for FromRefTime {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-			"sunset" => Ok(From::Sunset),
+			"sunset" => Ok(FromRefTime::Sunset),
             _ => Err(()),
         }
     }
@@ -81,7 +81,7 @@ struct ChangeItem {
 pub struct RawScheduleItem {
 	hour: Option<i8>,
 	minute: Option<i8>,
-	from: Option<From>,
+	from: Option<FromRefTime>,
 	change: ChangeItem,
 }
 
@@ -97,7 +97,7 @@ impl ProcessedScheduleItem {
 		let hour = raw.hour.unwrap_or(0);
 		let minute = raw.minute.unwrap_or(0);
 		let time = match &raw.from {
-			Some(s) if s == &From::Sunset => {
+			Some(s) if s == &FromRefTime::Sunset => {
 				let delta = TimeDelta::hours(hour as i64) + TimeDelta::minutes(minute as i64);
 				let r: DateTime<Tz> = *sunset_time + delta;
 				r
@@ -383,195 +383,198 @@ pub enum ChangeAction {
 
 #[cfg(test)]
 mod tests {
-    use chrono::{NaiveDateTime, TimeZone};
-    use chrono_tz::{Tz, US::Eastern};
-    use super::{blend_actions, get_surrounding_schedule_items, Action, ChangeAction, ChangeItem, ProcessedScheduleItem};
+	mod simple_tests {
+		use chrono::{NaiveDateTime, TimeZone};
+		use chrono_tz::{Tz, US::Eastern};
+		use crate::schedule::{blend_actions, get_surrounding_schedule_items,
+			Action, ChangeAction, ChangeItem, FromRefTime, ProcessedScheduleItem, RawScheduleItem};
 
-	const TEST_TZ: Tz = Eastern;
+		const TEST_TZ: Tz = Eastern;
 
-	fn get_naive_datetime(hour: u32, minute: u32) -> NaiveDateTime {
-		chrono::NaiveDate::from_ymd_opt(1999, 1, 1)
-			.unwrap()
-			.and_time(chrono::NaiveTime::from_hms_opt(hour, minute, 0).unwrap())
-	}
-
-	fn get_tz_datetime(hour: u32, minute: u32) -> chrono::DateTime<Tz> {
-		TEST_TZ.from_local_datetime(&get_naive_datetime(hour, minute))
-			.earliest()
-			.unwrap()
-	}
-
-	fn create_processed_schedule_item_color(hour: u32, minute: u32, mirek: u16, brightness: u8) -> ProcessedScheduleItem {
-		ProcessedScheduleItem {
-			time: get_tz_datetime(hour, minute),
-			change: ChangeItem {
-				action: Action::Color,
-				mirek: Some(mirek),
-				brightness: Some(brightness),
-			},
+		fn get_naive_datetime(hour: u32, minute: u32) -> NaiveDateTime {
+			chrono::NaiveDate::from_ymd_opt(1999, 1, 1)
+				.unwrap()
+				.and_time(chrono::NaiveTime::from_hms_opt(hour, minute, 0).unwrap())
 		}
-	}
 
-	fn create_processed_schedule_item_stop(hour: u32, minute: u32) -> ProcessedScheduleItem {
-		ProcessedScheduleItem {
-			time: get_tz_datetime(hour, minute),
-			change: ChangeItem {
+		fn get_tz_datetime(hour: u32, minute: u32) -> chrono::DateTime<Tz> {
+			TEST_TZ.from_local_datetime(&get_naive_datetime(hour, minute))
+				.earliest()
+				.unwrap()
+		}
+
+		fn create_processed_schedule_item_color(hour: u32, minute: u32, mirek: u16, brightness: u8) -> ProcessedScheduleItem {
+			ProcessedScheduleItem {
+				time: get_tz_datetime(hour, minute),
+				change: ChangeItem {
+					action: Action::Color,
+					mirek: Some(mirek),
+					brightness: Some(brightness),
+				},
+			}
+		}
+
+		fn create_processed_schedule_item_stop(hour: u32, minute: u32) -> ProcessedScheduleItem {
+			ProcessedScheduleItem {
+				time: get_tz_datetime(hour, minute),
+				change: ChangeItem {
+					action: Action::Stop,
+					mirek: None,
+					brightness: None,
+				},
+			}
+		}
+
+		#[test]
+		fn test_blend_action_stop_before() {
+			let stop_12 = create_processed_schedule_item_stop(12, 0);
+			let color_13 = create_processed_schedule_item_color(13, 0, 123, 50);
+
+			assert_eq!(
+				blend_actions(&stop_12, &color_13, &get_tz_datetime(12, 0)).expect("Expected action is obtainable"),
+				ChangeAction::None,
+			);
+
+			assert_eq!(
+				blend_actions(&stop_12, &color_13, &get_tz_datetime(12, 59)).expect("Expected action is obtainable"),
+				ChangeAction::None,
+			);
+		}
+
+		#[test]
+		fn test_blend_action_stop_after() {
+			let color_10 = create_processed_schedule_item_color(10, 0, 123, 50);
+			let stop_12 = create_processed_schedule_item_stop(12, 0);
+
+			assert_eq!(
+				blend_actions(&color_10, &stop_12, &get_tz_datetime(10, 0)).expect("Expected action is obtainable"),
+				ChangeAction::Color { mirek: 123, brightness: 50 },
+			);
+
+			assert_eq!(
+				blend_actions(&color_10, &stop_12, &get_tz_datetime(11, 30)).expect("Expected action is obtainable"),
+				ChangeAction::Color { mirek: 123, brightness: 50 },
+			);
+		}
+
+		#[test]
+		fn test_blend_action_invalid() {
+			let color_10 = create_processed_schedule_item_color(10, 0, 123, 50);
+			let stop_12 = create_processed_schedule_item_stop(12, 0);
+
+			assert!(blend_actions(&color_10, &stop_12, &get_tz_datetime(9, 59)).is_err());
+			assert!(blend_actions(&color_10, &stop_12, &get_tz_datetime(12, 1)).is_err());
+			assert!(blend_actions(&stop_12, &color_10, &get_tz_datetime(11, 0)).is_err());
+		}
+
+		#[test]
+		fn test_blend_action_2_colors() {
+			let color_10 = create_processed_schedule_item_color(10, 0, 200, 10);
+			let color_20 = create_processed_schedule_item_color(20, 0, 400, 90);
+
+			assert_eq!(
+				blend_actions(&color_10, &color_20, &get_tz_datetime(10, 0)).expect("Expected action is obtainable"),
+				ChangeAction::Color { mirek: 200, brightness: 10 },
+			);
+
+			assert_eq!(
+				blend_actions(&color_10, &color_20, &get_tz_datetime(15, 0)).expect("Expected action is obtainable"),
+				ChangeAction::Color { mirek: 300, brightness: 50 },
+			);
+
+			assert_eq!(
+				blend_actions(&color_10, &color_20, &get_tz_datetime(19, 30)).expect("Expected action is obtainable"),
+				ChangeAction::Color { mirek: 390, brightness: 86 },
+			);
+		}
+
+		fn create_test_schedule() -> Vec<ProcessedScheduleItem> {
+			vec![
+				create_processed_schedule_item_color(1, 0, 456, 50),
+				create_processed_schedule_item_color(10, 59, 456, 50),
+				create_processed_schedule_item_color(20, 30, 456, 50),
+			]
+		}
+
+		#[test]
+		fn test_surrounding_within() {
+			let schedule = create_test_schedule();
+			assert_eq!(
+				get_surrounding_schedule_items(&schedule, get_tz_datetime(1, 0))
+					.expect("Expect to get surrounding schedule items."),
+				(&schedule[0], &schedule[1])
+			);
+
+			assert_eq!(
+				get_surrounding_schedule_items(&schedule, get_tz_datetime(9, 0))
+					.expect("Expect to get surrounding schedule items."),
+				(&schedule[0], &schedule[1])
+			);
+
+			assert_eq!(
+				get_surrounding_schedule_items(&schedule, get_tz_datetime(10, 0))
+					.expect("Expect to get surrounding schedule items."),
+				(&schedule[0], &schedule[1])
+			);
+
+			assert_eq!(
+				get_surrounding_schedule_items(&schedule, get_tz_datetime(11, 0))
+					.expect("Expect to get surrounding schedule items."),
+				(&schedule[1], &schedule[2])
+			);
+
+			assert_eq!(
+				get_surrounding_schedule_items(&schedule, get_tz_datetime(20, 29))
+					.expect("Expect to get surrounding schedule items."),
+				(&schedule[1], &schedule[2])
+			);
+		}
+
+		#[test]
+		fn test_surrounding_outside() {
+			let schedule = create_test_schedule();
+			assert!(get_surrounding_schedule_items(&schedule, get_tz_datetime(0, 0)).is_err());
+			assert!(get_surrounding_schedule_items(&schedule, get_tz_datetime(20, 30)).is_err());
+			assert!(get_surrounding_schedule_items(&schedule, get_tz_datetime(20, 31)).is_err());
+		}
+
+		fn assert_schedule(
+			hour: Option<i8>,
+			minute: Option<i8>,
+			from: Option<FromRefTime>,
+			sunset_hour: u32,
+			sunset_minute: u32,
+			expected_hour: u32,
+			expected_minute: u32)
+		{
+			let today = chrono::NaiveDate::from_ymd_opt(1999, 1, 1).expect("Getting today");
+			let none_change = ChangeItem {
 				action: Action::Stop,
-				mirek: None,
+				mirek: Some(123),
 				brightness: None,
-			},
+			};
+			let item = ProcessedScheduleItem::from(
+				&TEST_TZ,
+				&RawScheduleItem { hour, minute, from, change: none_change.clone() },
+				today,
+				&get_tz_datetime(sunset_hour, sunset_minute)).expect("Expected item1 config to be fine.");
+
+			assert_eq!(item.time, get_tz_datetime(expected_hour, expected_minute));
+			assert_eq!(item.change, none_change);
 		}
-	}
 
-    #[test]
-    fn test_blend_action_stop_before() {
-		let stop_12 = create_processed_schedule_item_stop(12, 0);
-		let color_13 = create_processed_schedule_item_color(13, 0, 123, 50);
-
-		assert_eq!(
-			blend_actions(&stop_12, &color_13, &get_tz_datetime(12, 0)).expect("Expected action is obtainable"),
-			ChangeAction::None,
-		);
-
-		assert_eq!(
-			blend_actions(&stop_12, &color_13, &get_tz_datetime(12, 59)).expect("Expected action is obtainable"),
-			ChangeAction::None,
-		);
-    }
-
-    #[test]
-	fn test_blend_action_stop_after() {
-		let color_10 = create_processed_schedule_item_color(10, 0, 123, 50);
-		let stop_12 = create_processed_schedule_item_stop(12, 0);
-
-		assert_eq!(
-			blend_actions(&color_10, &stop_12, &get_tz_datetime(10, 0)).expect("Expected action is obtainable"),
-			ChangeAction::Color { mirek: 123, brightness: 50 },
-		);
-
-		assert_eq!(
-			blend_actions(&color_10, &stop_12, &get_tz_datetime(11, 30)).expect("Expected action is obtainable"),
-			ChangeAction::Color { mirek: 123, brightness: 50 },
-		);
-	}
-
-	#[test]
-	fn test_blend_action_invalid() {
-		let color_10 = create_processed_schedule_item_color(10, 0, 123, 50);
-		let stop_12 = create_processed_schedule_item_stop(12, 0);
-
-		assert!(blend_actions(&color_10, &stop_12, &get_tz_datetime(9, 59)).is_err());
-		assert!(blend_actions(&color_10, &stop_12, &get_tz_datetime(12, 1)).is_err());
-		assert!(blend_actions(&stop_12, &color_10, &get_tz_datetime(11, 0)).is_err());
-	}
-
-	#[test]
-	fn test_blend_action_2_colors() {
-		let color_10 = create_processed_schedule_item_color(10, 0, 200, 10);
-		let color_20 = create_processed_schedule_item_color(20, 0, 400, 90);
-
-		assert_eq!(
-			blend_actions(&color_10, &color_20, &get_tz_datetime(10, 0)).expect("Expected action is obtainable"),
-			ChangeAction::Color { mirek: 200, brightness: 10 },
-		);
-
-		assert_eq!(
-			blend_actions(&color_10, &color_20, &get_tz_datetime(15, 0)).expect("Expected action is obtainable"),
-			ChangeAction::Color { mirek: 300, brightness: 50 },
-		);
-
-		assert_eq!(
-			blend_actions(&color_10, &color_20, &get_tz_datetime(19, 30)).expect("Expected action is obtainable"),
-			ChangeAction::Color { mirek: 390, brightness: 86 },
-		);
-	}
-
-	fn create_test_schedule() -> Vec<ProcessedScheduleItem> {
-		vec![
-			create_processed_schedule_item_color(1, 0, 456, 50),
-			create_processed_schedule_item_color(10, 59, 456, 50),
-			create_processed_schedule_item_color(20, 30, 456, 50),
-		]
-	}
-
-	#[test]
-	fn test_surrounding_within() {
-		let schedule = create_test_schedule();
-		assert_eq!(
-			get_surrounding_schedule_items(&schedule, get_tz_datetime(1, 0))
-				.expect("Expect to get surrounding schedule items."),
-			(&schedule[0], &schedule[1])
-		);
-
-		assert_eq!(
-			get_surrounding_schedule_items(&schedule, get_tz_datetime(9, 0))
-				.expect("Expect to get surrounding schedule items."),
-			(&schedule[0], &schedule[1])
-		);
-
-		assert_eq!(
-			get_surrounding_schedule_items(&schedule, get_tz_datetime(10, 0))
-				.expect("Expect to get surrounding schedule items."),
-			(&schedule[0], &schedule[1])
-		);
-
-		assert_eq!(
-			get_surrounding_schedule_items(&schedule, get_tz_datetime(11, 0))
-				.expect("Expect to get surrounding schedule items."),
-			(&schedule[1], &schedule[2])
-		);
-
-		assert_eq!(
-			get_surrounding_schedule_items(&schedule, get_tz_datetime(20, 29))
-				.expect("Expect to get surrounding schedule items."),
-			(&schedule[1], &schedule[2])
-		);
-	}
-
-	#[test]
-	fn test_surrounding_outside() {
-		let schedule = create_test_schedule();
-		assert!(get_surrounding_schedule_items(&schedule, get_tz_datetime(0, 0)).is_err());
-		assert!(get_surrounding_schedule_items(&schedule, get_tz_datetime(20, 30)).is_err());
-		assert!(get_surrounding_schedule_items(&schedule, get_tz_datetime(20, 31)).is_err());
-	}
-
-	fn assert_schedule(
-		hour: Option<i8>,
-		minute: Option<i8>,
-		from: Option<super::From>,
-		sunset_hour: u32,
-		sunset_minute: u32,
-		expected_hour: u32,
-		expected_minute: u32)
-	{
-		let today = chrono::NaiveDate::from_ymd_opt(1999, 1, 1).expect("Getting today");
-		let none_change = ChangeItem {
-			action: Action::Stop,
-			mirek: Some(123),
-			brightness: None,
-		};
-		let item = ProcessedScheduleItem::from(
-			&TEST_TZ,
-			&super::RawScheduleItem { hour, minute, from, change: none_change.clone() },
-			today,
-			&get_tz_datetime(sunset_hour, sunset_minute)).expect("Expected item1 config to be fine.");
-
-		assert_eq!(item.time, get_tz_datetime(expected_hour, expected_minute));
-		assert_eq!(item.change, none_change);
-	}
-
-	#[test]
-	fn test_schedule_item_processing () {
-		assert_schedule(Some(10), Some(20), None,
-			2, 2, 10, 20);
-		assert_schedule(Some(10), Some(20), Some(super::From::Sunset),
-			2, 2, 12, 22);
-		assert_schedule(Some(-3), None, Some(super::From::Sunset),
-			20, 40, 17, 40);
-		assert_schedule(None, Some(-3), Some(super::From::Sunset),
-			20, 40, 20, 37);
-		assert_schedule(None, Some(120), Some(super::From::Sunset),
-			10, 30, 12, 30);
+		#[test]
+		fn test_schedule_item_processing () {
+			assert_schedule(Some(10), Some(20), None,
+				2, 2, 10, 20);
+			assert_schedule(Some(10), Some(20), Some(FromRefTime::Sunset),
+				2, 2, 12, 22);
+			assert_schedule(Some(-3), None, Some(FromRefTime::Sunset),
+				20, 40, 17, 40);
+			assert_schedule(None, Some(-3), Some(FromRefTime::Sunset),
+				20, 40, 20, 37);
+			assert_schedule(None, Some(120), Some(FromRefTime::Sunset),
+				10, 30, 12, 30);
+		}
 	}
 }
