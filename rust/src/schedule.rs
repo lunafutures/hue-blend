@@ -141,14 +141,8 @@ pub struct DebugInfo {
 	change_action: ChangeAction,
 }
 
-fn get_file_modification_time(path: &str) -> anyhow::Result<std::time::SystemTime> {
-    let metadata = std::fs::metadata(path)?;
-	Ok(metadata.modified()?)
-}
-
 #[derive(Debug)]
 pub struct Schedule {
-	yaml_path: String,
     tz: Tz,
 	location: LocationConfig,
 	pub raw_schedule: Vec<RawScheduleItem>,
@@ -191,7 +185,6 @@ impl Schedule {
 			.context(format!("Unable to find env var: {env_path_var}"))?;
 		let schedule_file = File::open(&yaml_path)
 			.context(format!("Unable to open file at {}", &yaml_path))?;
-		println!("File modified: {:?}", get_file_modification_time(&yaml_path).unwrap()); // XXX
 		let reader = BufReader::new(schedule_file);
 		let schedule_yaml_config: ScheduleYamlConfig = serde_yaml::from_reader(reader)
 			.context("Unable to parse schedule yaml file.")?;
@@ -204,7 +197,6 @@ impl Schedule {
 		}
 		
 		Ok(Schedule {
-			yaml_path,
 			tz,
 			location: schedule_yaml_config.location,
 			raw_schedule: schedule_yaml_config.schedule,
@@ -448,7 +440,6 @@ mod tests {
 			impl Schedule {
 				pub fn new_for_test(raw_schedule: Vec<RawScheduleItem>) -> Schedule {
 					Schedule {
-						yaml_path: String::from("C:/some_yaml_path"),
 						tz: TEST_TZ,
 						location: LocationConfig {
 							longitude: 10.,
