@@ -221,7 +221,7 @@ impl Schedule {
 
 	pub fn try_update(&mut self, now: DateTime<Tz>) -> anyhow::Result<bool> {
 		let updated = if self.todays_schedule.is_none() {
-			self.set_today()?;
+			self.set_today(&now)?;
 			true
 		} else {
 			let latest = match self.latest_scheduled_time() {
@@ -230,7 +230,7 @@ impl Schedule {
 			};
 
 			if latest < now {
-				self.set_today()?;
+				self.set_today(&now)?;
 				true
 			} else {
 				false
@@ -240,9 +240,9 @@ impl Schedule {
 		Ok(updated)
 	}
 
-	pub fn set_today(&mut self) -> anyhow::Result<()> {
+	pub fn set_today(&mut self, now: &DateTime<Tz>) -> anyhow::Result<()> {
 		let sunset_time = self.get_sunset_time().context("Unable to get sunset time.")?;
-		let today = chrono::Local::now().naive_local().date();
+		let today = now.date_naive();
 		let mut todays_schedule: Vec<ProcessedScheduleItem> = match self.raw_schedule
 				.iter()
 				.map(|raw_item| ProcessedScheduleItem::from(&self.tz, raw_item, today, &sunset_time))

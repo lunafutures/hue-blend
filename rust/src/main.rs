@@ -96,7 +96,8 @@ struct ForceUpdateBody {
 #[put("/force-update")]
 async fn force_update(state: &State<Arc<Mutex<Schedule>>>) -> Responses<ForceUpdateBody> {
     let mut guard = state.lock().await;
-    if let Err(e) = (*guard).set_today() {
+    let now = (*guard).now();
+    if let Err(e) = (*guard).set_today(&now) {
         return Responses::bad(e.to_string())
     }
 
