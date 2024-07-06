@@ -190,9 +190,9 @@ impl Schedule {
 			.context("Unable to parse schedule yaml file.")?;
 		let tz = match schedule_yaml_config.location.timezone.parse::<Tz>() {
 			Ok(tz) => Ok(tz),
-			Err(e) => Err(anyhow::Error::msg(format!("{e}"))),
+			Err(e) => Err(anyhow::Error::msg(e.to_string())),
 		}?;
-		if schedule_yaml_config.schedule.len() == 0 {
+		if schedule_yaml_config.schedule.is_empty() {
 			return Err(anyhow::Error::msg("Schedule must have at least 1 item in it."));
 		}
 		
@@ -207,7 +207,7 @@ impl Schedule {
 	pub fn get_sunset_time(&self, now: &DateTime<Tz>) -> anyhow::Result<DateTime<Tz>> {
 		match get_sunset_time(self.location.latitude, self.location.longitude, self.tz, now) {
 			Ok(time) => Ok(time),
-			Err(e) => Err(anyhow::Error::msg(format!("{e}"))),
+			Err(e) => Err(anyhow::Error::msg(e.to_string())),
 		}
 	}
 
@@ -233,7 +233,7 @@ impl Schedule {
 	}
 
 	pub fn set_today(&mut self, now: &DateTime<Tz>) -> anyhow::Result<()> {
-		let sunset_time = self.get_sunset_time(&now).context("Unable to get sunset time.")?;
+		let sunset_time = self.get_sunset_time(now).context("Unable to get sunset time.")?;
 
 		let today = now.date_naive();
 		let mut todays_schedule: Vec<ProcessedScheduleItem> = match self.raw_schedule
@@ -244,7 +244,7 @@ impl Schedule {
 			Err(e) => Err(e)?,
 		};
 
-		let first_item = todays_schedule.get(0).context("Unable to get first element of todays_schedule.")?;
+		let first_item = todays_schedule.first().context("Unable to get first element of todays_schedule.")?;
 		let mut first_repeat = first_item.clone();
 		first_repeat.time += TimeDelta::try_days(1).context("Unable to create a 1-day delta to add to create the last item.")?;
 		todays_schedule.push(first_repeat);
@@ -270,10 +270,7 @@ impl Schedule {
 		match &self.todays_schedule {
 			None => None,
 			Some(todays_schedule) => {
-				match todays_schedule.last() {
-					None => None,
-					Some(schedule_item) => Some(schedule_item.time)
-				}
+				todays_schedule.last().map(|schedule_item| schedule_item.time)
 			}
 		}
 	}
@@ -288,7 +285,7 @@ impl Schedule {
 
 	pub fn get_action_for_now(&self, now: &DateTime<Tz>) -> anyhow::Result<ChangeAction> {
 		let (a, b) = 
-			self.get_surrounding_schedule_items(now.clone())?;
+			self.get_surrounding_schedule_items(*now)?;
 
 		blend_actions(a, b, now)
 	}
@@ -338,7 +335,7 @@ pub fn blend_actions(a: &ProcessedScheduleItem, b: &ProcessedScheduleItem, now: 
 	}
 }
 
-pub fn get_surrounding_schedule_items<'a>(schedule: &'a Vec<ProcessedScheduleItem>, now: DateTime<Tz>) -> anyhow::Result<(&'a ProcessedScheduleItem, &'a ProcessedScheduleItem)> {
+pub fn get_surrounding_schedule_items(schedule: &[ProcessedScheduleItem], now: DateTime<Tz>) -> anyhow::Result<(&ProcessedScheduleItem, &ProcessedScheduleItem)> {
 	for i in 0..(schedule.len() - 1) {
 		let before = schedule.get(i).expect("Before too much");
 		let after = schedule.get(i + 1).expect("After too much");
