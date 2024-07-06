@@ -105,6 +105,11 @@ async fn force_update(state: &State<Arc<Mutex<Schedule>>>) -> Responses<ForceUpd
     Responses::good(ForceUpdateBody { just_updated: true })
 }
 
+#[catch(404)]
+fn not_found_handler(_req: &rocket::Request) -> String {
+    String::from("{\"error:\": \"In Rust, not found.\"}")
+}
+
 #[launch]
 fn rocket() -> _ {
     match dotenvy::dotenv() {
@@ -116,4 +121,5 @@ fn rocket() -> _ {
         .attach(fairing::AutoLogger)
         .manage(Arc::new(Mutex::new(Schedule::new().unwrap())))
         .mount("/", routes![index, get_debug_info, now, force_update])
+        .register("/", catchers![not_found_handler])
 }
