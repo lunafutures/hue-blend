@@ -229,7 +229,7 @@ impl Schedule {
 				None => return Err(anyhow::anyhow!("Should have a latest scheduled time after update.")),
 			};
 
-			if latest < now {
+			if latest <= now {
 				self.set_today(&now)?;
 				true
 			} else {
@@ -383,6 +383,7 @@ pub enum ChangeAction {
 
 #[cfg(test)]
 mod tests {
+
 	mod simple_tests {
 		use chrono::{NaiveDateTime, TimeZone};
 		use chrono_tz::{Tz, US::Eastern};
@@ -424,6 +425,86 @@ mod tests {
 				},
 			}
 		}
+
+		mod schedule_tests {
+			use chrono::{Datelike, NaiveDateTime, TimeZone};
+			use chrono_tz::{Tz, US::Eastern};
+			use crate::schedule::{Action, ChangeItem, LocationConfig, RawScheduleItem, Schedule};
+
+			const TEST_TZ: Tz = Eastern;
+
+			fn get_naive_datetime(day: u32, hour: u32, minute: u32) -> NaiveDateTime {
+				chrono::NaiveDate::from_ymd_opt(1999, 1, day)
+					.unwrap()
+					.and_time(chrono::NaiveTime::from_hms_opt(hour, minute, 0).unwrap())
+			}
+
+			fn get_tz_datetime(day: u32, hour: u32, minute: u32) -> chrono::DateTime<Tz> {
+				TEST_TZ.from_local_datetime(&get_naive_datetime(day, hour, minute))
+					.earliest()
+					.unwrap()
+			}
+
+			impl Schedule {
+				pub fn new_for_test(raw_schedule: Vec<RawScheduleItem>) -> Schedule {
+					Schedule {
+						yaml_path: String::from("C:/some_yaml_path"),
+						tz: TEST_TZ,
+						location: LocationConfig {
+							longitude: 10.,
+							latitude: 20.,
+							timezone: String::from("fake timezone"),
+						},
+						raw_schedule,
+						todays_schedule: None,
+					}
+				}
+			}
+
+			fn fake_schedule_item(hour: i8, minute: i8) -> RawScheduleItem {
+				RawScheduleItem {
+					hour: Some(hour),
+					minute: Some(minute),
+					from: None,
+					change: ChangeItem {
+						action: Action::Color,
+						mirek: Some(321),
+						brightness: Some(50),
+					},
+				}
+			}
+
+			#[test]
+			fn schedule_test() {
+				let mut schedule = Schedule::new_for_test(vec![
+					fake_schedule_item(1, 0), fake_schedule_item(10, 30),
+				]);
+
+				let day1 = get_tz_datetime(1, 10, 30);
+				assert_eq!(schedule.todays_schedule, None);
+				schedule.try_update(day1).unwrap();
+
+				assert!(schedule.todays_schedule.is_some());
+				let schedule1 = schedule.todays_schedule.clone().unwrap();
+				assert_eq!(schedule1.len(), 3);
+				assert_eq!(schedule1[0].time.day(), 1);
+
+				let day2_within = get_tz_datetime(2, 0, 0);
+				schedule.try_update(day2_within).unwrap();
+
+				let schedule2_within = schedule.todays_schedule.clone().unwrap();
+				assert_eq!(schedule2_within.len(), 3);
+				assert_eq!(schedule2_within[0].time.day(), 1); // no change
+
+				let day2_after = get_tz_datetime(2, 1, 0);
+				schedule.try_update(day2_after).unwrap();
+
+				let schedule2_after = schedule.todays_schedule.clone().unwrap();
+				assert_eq!(schedule2_after.len(), 3);
+				assert_eq!(schedule2_after[0].time.day(), 2);
+			}
+		}
+
 
 		#[test]
 		fn test_blend_action_stop_before() {
