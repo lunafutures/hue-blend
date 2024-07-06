@@ -212,8 +212,8 @@ impl Schedule {
 		})
 	}
 
-	pub fn get_sunset_time(&self) -> anyhow::Result<DateTime<Tz>> {
-		match get_sunset_time(self.location.latitude, self.location.longitude, self.tz, chrono::Local::now()) {
+	pub fn get_sunset_time(&self, now: &DateTime<Tz>) -> anyhow::Result<DateTime<Tz>> {
+		match get_sunset_time(self.location.latitude, self.location.longitude, self.tz, now) {
 			Ok(time) => Ok(time),
 			Err(e) => Err(anyhow::Error::msg(format!("{e}"))),
 		}
@@ -241,7 +241,8 @@ impl Schedule {
 	}
 
 	pub fn set_today(&mut self, now: &DateTime<Tz>) -> anyhow::Result<()> {
-		let sunset_time = self.get_sunset_time().context("Unable to get sunset time.")?;
+		let sunset_time = self.get_sunset_time(&now).context("Unable to get sunset time.")?;
+
 		let today = now.date_naive();
 		let mut todays_schedule: Vec<ProcessedScheduleItem> = match self.raw_schedule
 				.iter()
