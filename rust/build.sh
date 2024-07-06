@@ -28,7 +28,7 @@ function publish() (
 )
 
 function all() (
-	cargo clippy --fix
+	cargo clippy
 	cargo test
 	buildx
 	publish
