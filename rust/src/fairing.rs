@@ -17,27 +17,27 @@ impl Fairing for AutoLogger {
     }
 
     async fn on_response<'r>(&self, request: &'r Request<'_>, response: &mut Response<'r>) {
+        let mut body_message = String::from("(no body)");
+
         let body = response.body_mut().to_string().await;
         if let Ok(body) = body {
-            info!(
-                "Response for {} {}: {} {}",
-                request.method(),
-                request.uri(),
-                response.status(),
-                body,
-            );
-        } else {
-            info!(
-                "Response for {} {}: {}",
-                request.method(),
-                request.uri(),
-                response.status(),
-            );
+            body_message = body.to_string();
+
+            // If we read the response body like we did in this function, we need to then
+            // call set_sized_body(). Otherwise, the client will receive no response body.
+            response.set_sized_body(body.len(), std::io::Cursor::new(body));
         }
 
-        if response.status() != Status::Ok {
+        if response.status() == Status::Ok {
+            info!(
+                "Response for {} {}: {} {body_message}",
+                request.method(),
+                request.uri(),
+                response.status(),
+            );
+        } else {
             warn!(
-                "Non-OK status: {} for {} {}",
+                "Non-OK status: {} for {} {} {body_message}",
                 response.status(),
                 request.method(),
                 request.uri(),
