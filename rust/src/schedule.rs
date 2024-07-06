@@ -78,7 +78,7 @@ struct ChangeItem {
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 #[serde(crate = "rocket::serde")]
-pub struct RawScheduleItem {
+struct RawScheduleItem {
 	hour: Option<i8>,
 	minute: Option<i8>,
 	from: Option<FromRefTime>,
@@ -87,13 +87,13 @@ pub struct RawScheduleItem {
 
 #[derive(Debug, PartialEq, Clone, serde::Serialize)]
 #[serde(crate = "rocket::serde")]
-pub struct ProcessedScheduleItem {
+struct ProcessedScheduleItem {
 	time: DateTime<Tz>,
 	change: ChangeItem,
 }
 
 impl ProcessedScheduleItem {
-	pub fn from(tz: &Tz, raw: &RawScheduleItem, today: NaiveDate, sunset_time: &DateTime<Tz>) -> anyhow::Result<Self> {
+	fn from(tz: &Tz, raw: &RawScheduleItem, today: NaiveDate, sunset_time: &DateTime<Tz>) -> anyhow::Result<Self> {
 		let hour = raw.hour.unwrap_or(0);
 		let minute = raw.minute.unwrap_or(0);
 		let time = match &raw.from {
@@ -117,7 +117,7 @@ impl ProcessedScheduleItem {
 
 #[derive(Debug, serde::Deserialize)]
 #[serde(crate = "rocket::serde")]
-pub struct ScheduleYamlConfig {
+struct ScheduleYamlConfig {
 	location: LocationConfig,
 	schedule: Vec<RawScheduleItem>,
 }
@@ -145,8 +145,8 @@ pub struct DebugInfo {
 pub struct Schedule {
     tz: Tz,
 	location: LocationConfig,
-	pub raw_schedule: Vec<RawScheduleItem>,
-	pub todays_schedule: Option<Vec<ProcessedScheduleItem>>,
+	raw_schedule: Vec<RawScheduleItem>,
+	todays_schedule: Option<Vec<ProcessedScheduleItem>>,
 }
 
 impl Schedule {
@@ -180,7 +180,7 @@ impl Schedule {
 		Self::from_env("SCHEDULE_YAML_PATH")
 	}
 
-	pub fn from_env(env_path_var: &str) -> anyhow::Result<Self> {
+	fn from_env(env_path_var: &str) -> anyhow::Result<Self> {
 		let yaml_path = env::var(env_path_var)
 			.context(format!("Unable to find env var: {env_path_var}"))?;
 		let schedule_file = File::open(&yaml_path)
@@ -204,7 +204,7 @@ impl Schedule {
 		})
 	}
 
-	pub fn get_sunset_time(&self, now: &DateTime<Tz>) -> anyhow::Result<DateTime<Tz>> {
+	fn get_sunset_time(&self, now: &DateTime<Tz>) -> anyhow::Result<DateTime<Tz>> {
 		match get_sunset_time(self.location.latitude, self.location.longitude, self.tz, now) {
 			Ok(time) => Ok(time),
 			Err(e) => Err(anyhow::Error::msg(e.to_string())),
@@ -266,7 +266,7 @@ impl Schedule {
 		Ok(())
 	}
 
-	pub fn latest_scheduled_time(&self) -> Option<DateTime<Tz>> {
+	fn latest_scheduled_time(&self) -> Option<DateTime<Tz>> {
 		match &self.todays_schedule {
 			None => None,
 			Some(todays_schedule) => {
@@ -275,7 +275,7 @@ impl Schedule {
 		}
 	}
 
-	pub fn get_surrounding_schedule_items(&self, now: DateTime<Tz>) -> anyhow::Result<(&ProcessedScheduleItem, &ProcessedScheduleItem)> {
+	fn get_surrounding_schedule_items(&self, now: DateTime<Tz>) -> anyhow::Result<(&ProcessedScheduleItem, &ProcessedScheduleItem)> {
 		let todays_schedule = self.todays_schedule
 			.as_ref()
 			.context("todays_schedule has not been set.")?;
@@ -295,7 +295,7 @@ impl Schedule {
 	}
 }
 
-pub fn blend_actions(a: &ProcessedScheduleItem, b: &ProcessedScheduleItem, now: &DateTime<Tz>) -> anyhow::Result<ChangeAction> {
+fn blend_actions(a: &ProcessedScheduleItem, b: &ProcessedScheduleItem, now: &DateTime<Tz>) -> anyhow::Result<ChangeAction> {
 	if a.time > b.time {
 		return Err(anyhow::anyhow!("a.time ({a:?}) should not be after b.time ({b:?})"));
 	} else if now < &a.time {
@@ -335,7 +335,7 @@ pub fn blend_actions(a: &ProcessedScheduleItem, b: &ProcessedScheduleItem, now: 
 	}
 }
 
-pub fn get_surrounding_schedule_items(schedule: &[ProcessedScheduleItem], now: DateTime<Tz>) -> anyhow::Result<(&ProcessedScheduleItem, &ProcessedScheduleItem)> {
+fn get_surrounding_schedule_items(schedule: &[ProcessedScheduleItem], now: DateTime<Tz>) -> anyhow::Result<(&ProcessedScheduleItem, &ProcessedScheduleItem)> {
 	for i in 0..(schedule.len() - 1) {
 		let before = schedule.get(i).expect("Before too much");
 		let after = schedule.get(i + 1).expect("After too much");
@@ -358,7 +358,7 @@ pub fn get_surrounding_schedule_items(schedule: &[ProcessedScheduleItem], now: D
 	Err(anyhow::anyhow!("now ({now}) has reached an unknown error."))
 }
 
-pub fn fraction<T>(a_factor: f64, a_value: T, b_factor: f64, b_value: T) -> f64
+fn fraction<T>(a_factor: f64, a_value: T, b_factor: f64, b_value: T) -> f64
 where T: Into<f64>{
 	a_factor * a_value.into() + b_factor * b_value.into()
 }
@@ -426,7 +426,7 @@ mod tests {
 		}
 
 		impl Schedule {
-			pub fn new_for_test(raw_schedule: Vec<RawScheduleItem>) -> Schedule {
+			fn new_for_test(raw_schedule: Vec<RawScheduleItem>) -> Schedule {
 				Schedule {
 					tz: TEST_TZ,
 					location: LocationConfig {
