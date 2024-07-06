@@ -12,7 +12,7 @@ fi
 
 function debug() (
 	set -ex
-	docker-compose --build up
+	docker-compose up --build
 )
 
 function buildx() (
@@ -31,6 +31,7 @@ function publish() (
 
 function all() (
 	set -ex
+	cargo clippy --fix
 	cargo test
 	buildx
 	publish
