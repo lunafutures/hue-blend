@@ -9,6 +9,9 @@ else
 	echo VERSION=${VERSION}
 fi
 
+npm run lint
+npm run test
+
 source .env
 webpack
 
