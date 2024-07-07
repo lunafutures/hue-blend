@@ -76,6 +76,10 @@ async function getAndApplyChange() {
 
 export function startPeriodicUpdate() {
 	cron.schedule(env.getProperty('PERIODIC_UPDATE_CRON_STRING'), () => {
-		getAndApplyChange();
+		try {
+			getAndApplyChange();
+		} catch (e) {
+			logger.error(e);
+		}
 	});
 }
