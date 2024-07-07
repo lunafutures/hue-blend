@@ -8,12 +8,14 @@ pub struct AutoLogger;
 impl Fairing for AutoLogger {
     fn info(&self) -> Info {
         Info {
-            name: "GET/POST Counter",
+            name: "AutoLogger",
             kind: Kind::Request | Kind::Response
         }
     }
 
     async fn on_request(&self, _request: &mut Request<'_>, _: &mut Data<'_>) {
+        // Don't need to log since rocket will do that automatically
+        // if `log_level = "normal"` is set in Rocket.toml
     }
 
     async fn on_response<'r>(&self, request: &'r Request<'_>, response: &mut Response<'r>) {
