@@ -11,6 +11,7 @@ tlsSecret:
 
 namespaces:
   hue: default
+  registry: registry
 
 imageResources:
   rust:
@@ -21,6 +22,10 @@ imageResources:
     limits:
       memory: "512Mi"
       cpu: "100m"
+  registry:
+    limits:
+      memory: "256Mi"
+      cpu: "100m"
 
 secrets:
   rustSchedule:
@@ -29,3 +34,5 @@ secrets:
   rust:
   hueExpress:
   hueBridgeCaCert:
+  registryBasicAuth:
+  registryPersistentStoragePath:

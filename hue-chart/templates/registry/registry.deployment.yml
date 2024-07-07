@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: registry
+  namespace: {{ .Values.namespaces.registry }}
+  labels:
+    app: registry
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: registry
+  template:
+    metadata:
+      labels:
+        app: registry
+    spec:
+      containers:
+        - name: registry
+          image: registry:2.8.3
+          ports:
+            - containerPort: 5000
+              name: registry-port
+          env:
+            - name: REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY
+              value: /data
+            - name: REGISTRY_AUTH_HTPASSWD_REALM # XXX TODO What do these do?
+              value: Registry Realm
+            - name: REGISTRY_AUTH_HTPASSWD_PATH
+              value: /auth/htpasswd
+          volumeMounts:
+            - name: registry-storage
+              mountPath: /data
+            - name: auth-volume
+              mountPath: /auth
+          resources:
+            {{- .Values.imageResources.registry | toYaml | nindent 12 }}
+      volumes:
+        - name: registry-storage
+          hostPath:
+            path: {{ .Values.secrets.registryPersistentStoragePath }}
+            type: DirectoryOrCreate
+        - name: auth-volume
+          secret:
+            secretName: registry-auth-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: registry-service
+  namespace: {{ .Values.namespaces.registry }}
+spec:
+  type: ClusterIP
+  selector:
+    app: registry
+  ports:
+    - protocol: TCP
+      port: 5000
+      targetPort: 5000
