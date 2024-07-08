@@ -26,7 +26,7 @@ metadata:
   namespace: {{ .Values.namespaces.hue }}
 type: Opaque
 data:
-  users: {{ printf "%s:%s" .Values.secrets.hueAuth.username .Values.secrets.hueAuth.password | b64enc | quote }}
+  users: {{ include "hue-chart.htpasswd" .Values.secrets.hueAuth }}
 ---
 apiVersion: traefik.containo.us/v1alpha1
 kind: Middleware

@@ -60,3 +60,10 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{- define "hue-chart.htpasswd" -}}
+{{- $username := .username -}}
+{{- $password := .password -}}
+{{- $htpasswd := printf "%s:%s" $username (bcrypt $password) -}}
+{{- $htpasswd | b64enc | quote -}}
+{{- end -}}
