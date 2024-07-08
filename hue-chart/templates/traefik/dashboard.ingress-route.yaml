@@ -18,23 +18,12 @@ spec:
     secret: dashboard-users
 ---
 apiVersion: traefik.containo.us/v1alpha1
-kind: Middleware
-metadata:
-  name: redirect-https
-  namespace: {{ .Values.namespaces.traefik }}
-spec:
-  redirectScheme:
-    permanent: true
-    scheme: https
----
-apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
 metadata:
   name: traefik-dashboard-secure
   namespace: {{ .Values.namespaces.traefik }}
 spec:
   entryPoints:
-    - web
     - websecure
   tls:
     secretName: {{ .Values.tlsSecret }}
@@ -42,7 +31,6 @@ spec:
     - kind: Rule
       match: PathPrefix(`/api`) && Host(`{{ .Values.hosts.local }}`)
       middlewares:
-        - name: redirect-https
         - name: dashboard-auth
       services:
         - kind: TraefikService
@@ -50,7 +38,6 @@ spec:
     - kind: Rule
       match: PathPrefix(`/dashboard`) && Host(`{{ .Values.hosts.local }}`)
       middlewares:
-        - name: redirect-https
         - name: dashboard-auth
       services:
         - kind: TraefikService
