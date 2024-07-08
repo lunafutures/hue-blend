@@ -12,10 +12,12 @@ tlsSecret:
 enabled:
   hue: true
   registry: true
+  traefik: true
 
 namespaces:
   hue: default
   registry: registry
+  traefik: kube-system
 
 imageResources:
   rust:

@@ -1,0 +1,58 @@
+{{ if .Values.enabled.traefik }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dashboard-users
+  namespace: {{ .Values.namespaces.traefik }}
+type: Opaque
+data:
+  users: {{ include "hue-chart.htpasswd" .Values.secrets.traefikAuth }}
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: dashboard-auth
+  namespace: {{ .Values.namespaces.traefik }}
+spec:
+  basicAuth:
+    secret: dashboard-users
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: redirect-https
+  namespace: {{ .Values.namespaces.traefik }}
+spec:
+  redirectScheme:
+    permanent: true
+    scheme: https
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: traefik-dashboard-secure
+  namespace: {{ .Values.namespaces.traefik }}
+spec:
+  entryPoints:
+    - web
+    - websecure
+  tls:
+    secretName: {{ .Values.tlsSecret }}
+  routes:
+    - kind: Rule
+      match: PathPrefix(`/api`) && Host(`{{ .Values.hosts.local }}`)
+      middlewares:
+        - name: redirect-https
+        - name: dashboard-auth
+      services:
+        - kind: TraefikService
+          name: api@internal
+    - kind: Rule
+      match: PathPrefix(`/dashboard`) && Host(`{{ .Values.hosts.local }}`)
+      middlewares:
+        - name: redirect-https
+        - name: dashboard-auth
+      services:
+        - kind: TraefikService
+          name: api@internal
+{{ end }}
