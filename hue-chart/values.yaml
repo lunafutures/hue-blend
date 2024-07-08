@@ -9,6 +9,10 @@ hosts:
 
 tlsSecret:
 
+enabled:
+  hue: true
+  registry: true
+
 namespaces:
   hue: default
   registry: registry

@@ -1,4 +1,6 @@
+{{ if .Values.enabled.registry }}
 apiVersion: v1
 kind: Namespace
 metadata:
   name: {{ .Values.namespaces.registry }}
+{{ end }}

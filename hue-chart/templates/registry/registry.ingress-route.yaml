@@ -1,3 +1,4 @@
+{{ if .Values.enabled.registry }}
 apiVersion: traefik.containo.us/v1alpha1
 kind: Middleware
 metadata:
@@ -32,3 +33,4 @@ spec:
       services:
         - name: registry-service
           port: 5000
+{{ end }}

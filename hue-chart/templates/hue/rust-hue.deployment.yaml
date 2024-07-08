@@ -1,3 +1,4 @@
+{{ if .Values.enabled.hue }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -48,3 +49,4 @@ spec:
   ports:
   - port: 8000
     targetPort: 8000
+{{ end }}
