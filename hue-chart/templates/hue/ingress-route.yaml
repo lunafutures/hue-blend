@@ -18,6 +18,24 @@ spec:
     prefixes:
       - /rust
 ---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: hue-auth-secret
+  namespace: {{ .Values.namespaces.hue }}
+type: Opaque
+data:
+  users: {{ printf "%s:%s" .Values.secrets.hueAuth.username .Values.secrets.hueAuth.password | b64enc | quote }}
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: hue-auth
+  namespace: {{ .Values.namespaces.hue }}
+spec:
+  basicAuth:
+    secret: hue-auth-secret
+---
 apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
 metadata:
@@ -32,6 +50,7 @@ spec:
     - kind: Rule
       match: PathPrefix(`/hue`) && Host(`{{ .Values.hosts.local }}`)
       middlewares:
+        - name: hue-auth
         - name: strip-hue
       services:
         - name: hue-express-service
@@ -39,6 +58,7 @@ spec:
     - kind: Rule
       match: PathPrefix(`/rust`) && Host(`{{ .Values.hosts.local }}`)
       middlewares:
+        - name: hue-auth
         - name: strip-rust
       services:
         - name: rust-hue-service
