@@ -22,12 +22,12 @@ spec:
     secretName: {{ .Values.tlsSecret }}
   routes:
     - kind: Rule
-      match: Host("{{ .Values.hosts.registry }}") 
+      match: Host(`{{ .Values.hosts.registry }}`) 
       services:
         - name: registry-service
           port: 5000
     - kind: Rule
-      match: Host("{{ .Values.hosts.local }}") && PathPrefix("/registry")
+      match: Host(`{{ .Values.hosts.local }}`) && PathPrefix(`/registry`)
       middlewares:
         - name: strip-registry
       services:
