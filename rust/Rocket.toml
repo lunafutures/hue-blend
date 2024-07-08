@@ -2,4 +2,4 @@
 log_level = "normal" # Rocket will print "GET /path" when the request is received
 
 [release]
-address = "0.0.0.0"
+address = "0.0.0.0" # Allows listening from everywhere, instead of just localhost
