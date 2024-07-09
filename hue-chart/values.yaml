@@ -17,6 +17,11 @@ namespaces:
   registry: registry
   traefik: kube-system
 
+livenessProbePeriodSeconds:
+  hue: 30
+  rust: 30
+  registry: 120
+
 # Copy the image-pull-secret to the following namespaces
 registryImagePullSecretsNamespaces:
 

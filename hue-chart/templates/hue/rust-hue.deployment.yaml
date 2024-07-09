@@ -22,6 +22,12 @@ spec:
           ports:
             - containerPort: 8000
               name: rocket-port
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: {{ .Values.livenessProbePeriodSeconds.rust }}
           env:
             - name: SCHEDULE_YAML_PATH
               value: /data/schedule.yml
