@@ -1,6 +1,4 @@
-# Default values for hue-chart.
-# This is a YAML-formatted file.
-# Declare variables to be passed into your templates.
+# Default values. Must be filled in.
 
 hosts:
   registry: "{{ .Values.secrets.registry.host }}"
@@ -19,6 +17,9 @@ namespaces:
   registry: registry
   traefik: kube-system
 
+# Copy the image-pull-secret to the following namespaces
+registryImagePullSecretsNamespaces:
+
 imageResources:
   rust:
     limits:
@@ -34,11 +35,20 @@ imageResources:
       cpu: "100m"
 
 secrets:
+  hueAuth:
+    username:
+    password:
+  traefikAuth:
+    username:
+    password:
   rustSchedule:
     location:
     schedule:
-  rust:
   hueExpress:
   hueBridgeCaCert:
-  registryBasicAuth:
-  registryPersistentStoragePath:
+  registry:
+    auth:
+      username:
+      password:
+    host:
+    persistentStoragePath:

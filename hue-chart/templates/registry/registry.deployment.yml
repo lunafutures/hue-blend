@@ -39,7 +39,7 @@ spec:
       volumes:
         - name: registry-storage
           hostPath:
-            path: {{ .Values.secrets.registryPersistentStoragePath }}
+            path: {{ .Values.secrets.registry.persistentStoragePath }}
             type: DirectoryOrCreate
         - name: auth-volume
           secret:
