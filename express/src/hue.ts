@@ -87,8 +87,13 @@ export type IndividualDictionary = {
 }
 
 function getLightsOnInGroup(lights: LightBody, rids: string[]): LightData[] {
-	return _.filter(lights.data, (light: LightData) =>
+	const ownerRidSearch = _.filter(lights.data, (light: LightData) =>
+		_.includes(rids, light.owner.rid) && light.on.on === true);
+	const idSearch = _.filter(lights.data, (light: LightData) =>
 		_.includes(rids, light.id) && light.on.on === true);
+
+	logger.debug(`Of the lights on: light.owner.rid matched: ${ownerRidSearch.length}, light.id matched: ${idSearch.length}.`);
+	return ownerRidSearch.length >= idSearch.length ? ownerRidSearch : idSearch;
 }
 
 const ALLOWED_BRIGHTNESS_DIFF = 1.0;
