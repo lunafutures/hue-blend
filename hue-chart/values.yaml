@@ -3,7 +3,7 @@
 # Declare variables to be passed into your templates.
 
 hosts:
-  registry: example.com
+  registry: "{{ .Values.secrets.registry.host }}"
   main: example.org
   local: 127.0.0.1
 

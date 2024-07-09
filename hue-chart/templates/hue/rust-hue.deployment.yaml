@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: rust-container
-          image: {{ .Values.hosts.registry }}/rust-hue:arm-latest
+          image: {{ tpl .Values.hosts.registry . }}/rust-hue:arm-latest
           ports:
             - containerPort: 8000
               name: rocket-port

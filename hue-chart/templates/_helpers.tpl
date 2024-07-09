@@ -67,3 +67,7 @@ Create the name of the service account to use
 {{- $htpasswd := printf "%s:%s" $username (bcrypt $password) -}}
 {{- $htpasswd | b64enc | quote -}}
 {{- end -}}
+
+{{- define "hue-chart.imagePullSecret" }}
+{{- printf "{\"auths\": {\"%s\": {\"auth\": \"%s\"}}}" .host (printf "%s:%s" .auth.username .auth.password | b64enc) | b64enc }}
+{{- end }}
