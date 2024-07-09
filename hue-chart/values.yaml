@@ -18,9 +18,9 @@ namespaces:
   traefik: kube-system
 
 livenessProbePeriodSeconds:
-  hue: 30
-  rust: 30
-  registry: 120
+  hue: 37
+  rust: 37
+  registry: 127
 
 # Copy the image-pull-secret to the following namespaces
 registryImagePullSecretsNamespaces:
