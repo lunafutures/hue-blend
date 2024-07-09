@@ -4,7 +4,7 @@ dotenv.config();
 import express from "express";
 import Joi from "joi"
 
-import { GroupChange, setGroup, updateColor } from "./hue";
+import { GroupChange, mutexTest, setGroup, updateColor } from "./hue";
 import { startPeriodicUpdate } from "./colorManager";
 import { State } from "./state";
 import { EnvValidator } from "./envValidator";
@@ -124,8 +124,10 @@ app.get('/debug', async (_req: express.Request, res: express.Response) => {
 	}
 });
 
-app.get('/', (_req: express.Request, res: express.Response) => {
+app.get('/', async (_req: express.Request, res: express.Response) => {
 	try {
+		// Run a mutex test to let the liveness probe know of a deadlock
+		await mutexTest(); 
 		res.json({ up: true });
 	} catch (error) {
 		handleErrorResponse(error as Error, res);

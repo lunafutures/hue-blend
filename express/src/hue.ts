@@ -290,3 +290,7 @@ function hueRequest<T, D>(config: Partial<AxiosRequestConfig<D>>): Promise<Axios
 		...config,
 	});
 }
+
+export async function mutexTest() {
+	await hueMutex.runExclusive(async () => { });
+}
