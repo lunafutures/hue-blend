@@ -19,6 +19,7 @@ spec:
       containers:
         - name: hue-express-container
           image: {{ tpl .Values.hosts.registry . }}/hue-express:arm-latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 3000
               name: rocket-port
