@@ -9,6 +9,7 @@ import rateLimit from 'axios-rate-limit';
 import { State } from "./state";
 import { EnvValidator } from "./envValidator";
 import { logger } from "./logging";
+import { Mutex } from "async-mutex";
 
 interface ProcessEnv {
 	HUE_BRIDGE_BASE_URL: string;
@@ -23,6 +24,7 @@ const envSchema = Joi.object<ProcessEnv>({
 	HUE_BRIDGE_ID: Joi.string().required(),
 });
 const env = new EnvValidator<ProcessEnv>(envSchema);
+const hueMutex = new Mutex();
 
 interface Resource {
 	rid: string,
@@ -126,26 +128,28 @@ function getRids(group: Group): string[] {
 	return _.map(group.children, resource => resource.rid);
 }
 
-export async function updateColor(groupName: string, mirek: number, brightness: number) {
-	logger.info(`Updating color: mirek=${mirek} brightness=${brightness}.`);
+export async function updateColor(groupName: string, mirek: number, brightness: number): Promise<GenericBody | undefined> {
+	return await hueMutex.runExclusive(async () => {
+		logger.info(`Updating color: mirek=${mirek} brightness=${brightness}.`);
 
-	const state = await State.getInstance();
-	if (noLightsDeviate(await getLights(), getRids(state.getGroup(groupName)), mirek, brightness)) {
-		logger.debug("Not updating lights because no lights deviate.");
-		return;
-	}
+		const state = await State.getInstance();
+		if (noLightsDeviate(await getLights(), getRids(state.getGroup(groupName)), mirek, brightness)) {
+			logger.debug("Not updating lights because no lights deviate.");
+			return;
+		}
 
-	const group = state.getGroup(groupName);
-	const response = await hueRequest({
-		method: "put",
-		url: `${env.getProperty('HUE_BRIDGE_BASE_URL')}/clip/v2/resource/grouped_light/${group.id}`,
-		data: {
-			type: "grouped_light",
-			dimming: { brightness },
-			color_temperature: { mirek },
-		},
+		const group = state.getGroup(groupName);
+		const response = await hueRequest({
+			method: "put",
+			url: `${env.getProperty('HUE_BRIDGE_BASE_URL')}/clip/v2/resource/grouped_light/${group.id}`,
+			data: {
+				type: "grouped_light",
+				dimming: { brightness },
+				color_temperature: { mirek },
+			},
+		});
+		return response.data as GenericBody;
 	});
-	return response.data as GenericBody;
 }
 
 export enum GroupChange {
@@ -160,6 +164,7 @@ interface OnOn {
 }
 
 function getOnOn(groupChange: GroupChange, numLightsOn: number): OnOn {
+	logger.warn(`numLightsOn: ${numLightsOn}`);
 	switch(groupChange) {
 		case GroupChange.ON: return { on: { on: true } };
 		case GroupChange.OFF: return { on: { on: false } };
@@ -214,34 +219,36 @@ export async function getLights(): Promise<LightBody> {
 	return response.data as LightBody;
 }
 
-export async function setGroup(groupName: string, change: GroupChange, mirek?: number, brightness?: number) {
-	const state = await State.getInstance();
-	const lightsOnInGroup = getLightsOnInGroup(
-		await getLights(),
-		getRids(state.getGroup(groupName)));
-	const onOn = getOnOn(change, lightsOnInGroup.length);
+export async function setGroup(groupName: string, change: GroupChange, mirek?: number, brightness?: number): Promise<GenericBody> {
+	return await hueMutex.runExclusive(async () => {
+		const state = await State.getInstance();
+		const lightsOnInGroup = getLightsOnInGroup(
+			await getLights(),
+			getRids(state.getGroup(groupName)));
+		const onOn = getOnOn(change, lightsOnInGroup.length);
 
-	const changeAction = state.lastChange?.change_action;
-	const mirekBrightnessConfig = changeAction === undefined || changeAction === "none"
-		? getMirekBrightnessConfig(mirek, brightness)
-		: getMirekBrightnessConfig(
-			mirek ?? changeAction.color.mirek,
-			brightness ?? changeAction.color.brightness);
+		const changeAction = state.lastChange?.change_action;
+		const mirekBrightnessConfig = changeAction === undefined || changeAction === "none"
+			? getMirekBrightnessConfig(mirek, brightness)
+			: getMirekBrightnessConfig(
+				mirek ?? changeAction.color.mirek,
+				brightness ?? changeAction.color.brightness);
 
-	const data = {
+		const data = {
 			type: "grouped_light",
 			...onOn,
 			...mirekBrightnessConfig,
-	};
-	logger.debug(`Setting group on "${groupName}": ${JSON.stringify(data)}.`);
+		};
+		logger.debug(`Setting group on "${groupName}": ${JSON.stringify(data)}.`);
 
-	const group = state.getGroup(groupName);
-	const response = await hueRequest({
-		method: "put",
-		url: `${env.getProperty('HUE_BRIDGE_BASE_URL')}/clip/v2/resource/grouped_light/${group.id}`,
-		data,
+		const group = state.getGroup(groupName);
+		const response = await hueRequest({
+			method: "put",
+			url: `${env.getProperty('HUE_BRIDGE_BASE_URL')}/clip/v2/resource/grouped_light/${group.id}`,
+			data,
+		});
+		return response.data as GenericBody;
 	});
-	return response.data as GenericBody;
 }
 
 const rateLimitedHueRequester = (function() {
