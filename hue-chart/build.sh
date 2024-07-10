@@ -4,17 +4,28 @@ function template() (
 	helm template . --debug -f values.yaml -f values.private.yaml > helm-output.yaml
 )
 
+function build-deps() (
+	helm dependency build
+)
+
 function lint() (
 	helm lint .
 )
 
-RELEASE_NAME=davis
-function install() (
-	helm install ${RELEASE_NAME} . --debug -f values.yaml -f values.private.yaml
-)
+function create-namespaces() {
+	for namespace in registry; do
+		kubectl create namespace ${namespace} --dry-run=client -o yaml | kubectl apply -f -
+	done
+}
 
-function upgrade() (
-	helm upgrade ${RELEASE_NAME} . --debug -f values.yaml -f values.private.yaml
+RELEASE_NAME=blue
+function install() (
+	create-namespaces
+
+	kubens default
+	helm upgrade --install ${RELEASE_NAME} . \
+		-f values.yaml \
+		-f values.private.yaml
 )
 
 function uninstall() (

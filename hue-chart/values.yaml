@@ -42,6 +42,12 @@ imageResources:
       memory: "256Mi"
       cpu: "100m"
 
+reflector:
+  resources:
+    limits:
+      memory: "512Mi"
+      cpu: "100m"
+
 secrets:
   hueAuth:
     username: example
