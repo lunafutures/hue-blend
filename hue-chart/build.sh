@@ -4,6 +4,10 @@ function template() (
 	helm template . --debug -f values.yaml -f values.private.yaml > helm-output.yaml
 )
 
+function lint() (
+	helm lint .
+)
+
 RELEASE_NAME=davis
 function install() (
 	helm install ${RELEASE_NAME} . --debug -f values.yaml -f values.private.yaml
@@ -25,7 +29,7 @@ function show-installed() (
 	helm list --all --all-namespaces
 )
 
-if [ -z $@ ]; then
+if [ -z "$@" ]; then
 	template
 else
 	$@

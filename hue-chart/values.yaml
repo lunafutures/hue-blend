@@ -25,6 +25,9 @@ livenessProbePeriodSeconds:
 # Copy the image-pull-secret to the following namespaces
 registryImagePullSecretsNamespaces:
 
+cert-manager:
+  namespace: cert-manager
+
 imageResources:
   rust:
     limits:
@@ -41,19 +44,19 @@ imageResources:
 
 secrets:
   hueAuth:
-    username:
-    password:
+    username: example
+    password: password
   traefikAuth:
-    username:
-    password:
+    username: example
+    password: password
   rustSchedule:
     location:
     schedule:
   hueExpress:
-  hueBridgeCaCert:
+  hueBridgeCaCert: certGoesHere
   registry:
     auth:
-      username:
-      password:
+      username: example
+      password: password
     host:
     persistentStoragePath:
