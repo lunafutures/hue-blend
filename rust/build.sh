@@ -20,11 +20,17 @@ function buildx() (
 )
 
 function publish() (
-	docker tag rust-hue:arm-${VERSION} registry.blahblahblah.xyz/rust-hue:arm-${VERSION}
-	docker push registry.blahblahblah.xyz/rust-hue:arm-${VERSION}
+	source .env
+	if [ -z "${REGISTRY_URL}" ]; then
+		echo "Env var \${REGISTRY_URL} not found."
+		exit 1
+	fi
 
-	docker tag rust-hue:arm-${VERSION} registry.blahblahblah.xyz/rust-hue:arm-latest
-	docker push registry.blahblahblah.xyz/rust-hue:arm-latest
+	docker tag rust-hue:arm-${VERSION} ${REGISTRY_URL}/rust-hue:arm-${VERSION}
+	docker push ${REGISTRY_URL}/rust-hue:arm-${VERSION}
+
+	docker tag rust-hue:arm-${VERSION} ${REGISTRY_URL}/rust-hue:arm-latest
+	docker push ${REGISTRY_URL}/rust-hue:arm-latest
 )
 
 function all() (
