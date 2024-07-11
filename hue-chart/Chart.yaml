@@ -33,3 +33,7 @@ dependencies:
     version: v7.1.288
     repository: https://emberstack.github.io/helm-charts
     alias: reflector
+  - name: ddns-updater
+    version: 11.2.1
+    repository: oci://tccr.io/truecharts
+    alias: ddns-updater
