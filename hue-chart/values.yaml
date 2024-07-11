@@ -31,6 +31,17 @@ cert-manager:
   namespace: cert-manager
   installCRDs: true
 
+ddns-updater:
+  workload:
+    main:
+      podSpec:
+        containers:
+          main:
+            env:
+              CONFIG: "{{ .Values.innerConfig | toJson }}"
+              PERIOD: "60m"
+  innerConfig:
+
 # Specific to our configs
 certManager:
   tlsNamespaces: 

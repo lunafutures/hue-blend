@@ -1,0 +1,28 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: strip-ddns
+  namespace: {{ .Release.Namespace }}
+spec:
+  stripPrefix:
+    prefixes:
+      - /ddns
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: traefik-ddns
+  namespace: {{ .Release.Namespace }}
+spec:
+  entryPoints:
+    - websecure
+  tls:
+    secretName: {{ .Values.tlsSecret }} # must be within the same namespace
+  routes:
+    - kind: Rule
+      match: PathPrefix(`/ddns`) && Host(`{{ .Values.hosts.local }}`)
+      middlewares:
+        - name: strip-ddns
+      services:
+        - name: {{ .Release.Name }}-ddns-updater
+          port: 10227
