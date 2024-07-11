@@ -25,6 +25,10 @@ appVersion: "1.16.0"
 
 # Run `helm dependency build` when changed
 dependencies:
+  - name: cert-manager
+    version: v1.14.7
+    repository: https://charts.jetstack.io
+    alias: cert-manager
   - name: reflector
     version: v7.1.288
     repository: https://emberstack.github.io/helm-charts

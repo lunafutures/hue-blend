@@ -1,0 +1,19 @@
+{{ if.Values.enabled.certManager }}
+apiVersion: cert-manager.io/v1
+# ClusterIssuer = resources that represent certificate authorities (CAs)
+# able to sign certificates in response to certificate signing requests
+kind: ClusterIssuer
+metadata:
+  name: lets-encrypt
+  namespace: {{ .Values.namespaces.certManager }}
+spec:
+  acme:
+    email: {{ .Values.certManager.issuerEmail }}
+    server: {{ .Values.certManager.server }}
+    privateKeySecretRef:
+      name: {{ .Values.certManager.privateKeySecretName }}
+    solvers:
+    - http01:
+        ingress:
+          class: traefik
+{{ end }}
