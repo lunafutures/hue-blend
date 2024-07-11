@@ -1,3 +1,21 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ddns-auth-secret
+  namespace: {{ .Release.Namespace }}
+type: Opaque
+data:
+  users: {{ include "hue-chart.htpasswd" .Values.secrets.ddnsAuth }}
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: ddns-auth
+  namespace: {{ .Release.Namespace }}
+spec:
+  basicAuth:
+    secret: ddns-auth-secret
+---
 apiVersion: traefik.containo.us/v1alpha1
 kind: Middleware
 metadata:
@@ -23,6 +41,7 @@ spec:
       match: PathPrefix(`/ddns`) && Host(`{{ .Values.hosts.local }}`)
       middlewares:
         - name: strip-ddns
+        - name: ddns-auth
       services:
         - name: {{ .Release.Name }}-ddns-updater
           port: 10227
