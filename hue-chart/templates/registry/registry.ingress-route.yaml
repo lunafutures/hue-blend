@@ -16,7 +16,6 @@ metadata:
   namespace: {{ .Values.namespaces.registry }}
 spec:
   entryPoints:
-    - web
     - websecure
   tls:
     secretName: {{ .Values.tlsSecret }}
