@@ -1,4 +1,4 @@
-{{ if .Values.enabled.hue }}
+{{ if .Values.tags.hue }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:

@@ -7,11 +7,12 @@ hosts:
 
 tlsSecret:
 
-enabled:
+tags:
   hue: true
   registry: true
   traefik: true
   certManager: true # You'll probably want to turn this off to install CRDs first, then turn back on.
+  ddnsUpdater: true
 
 namespaces:
   hue: default

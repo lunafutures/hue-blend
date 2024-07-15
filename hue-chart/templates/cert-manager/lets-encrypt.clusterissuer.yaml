@@ -1,4 +1,4 @@
-{{ if.Values.enabled.certManager }}
+{{ if.Values.tags.certManager }}
 apiVersion: cert-manager.io/v1
 # ClusterIssuer = resources that represent certificate authorities (CAs)
 # able to sign certificates in response to certificate signing requests

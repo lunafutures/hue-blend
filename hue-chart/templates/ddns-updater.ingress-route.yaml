@@ -1,3 +1,4 @@
+{{ if.Values.tags.ddnsUpdater }}
 apiVersion: v1
 kind: Secret
 metadata:
@@ -45,3 +46,4 @@ spec:
       services:
         - name: {{ .Release.Name }}-ddns-updater
           port: 10227
+{{ end }}

@@ -29,6 +29,8 @@ dependencies:
     version: v1.14.7
     repository: https://charts.jetstack.io
     alias: cert-manager
+    tags:
+      - certManager
   - name: reflector
     version: v7.1.288
     repository: https://emberstack.github.io/helm-charts
@@ -37,3 +39,5 @@ dependencies:
     version: 11.2.1
     repository: oci://tccr.io/truecharts
     alias: ddns-updater
+    tags:
+      - ddnsUpdater

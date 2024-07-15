@@ -1,4 +1,4 @@
-{{ if .Values.enabled.traefik }}
+{{ if .Values.tags.traefik }}
 apiVersion: v1
 kind: Secret
 metadata:
