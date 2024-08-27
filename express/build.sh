@@ -6,7 +6,7 @@ if [ -z $version ]; then
 	echo "\$version cannot be empty. Run this script from \`npm run\`."
 	exit 1
 else
-	echo VERSION=${VERSION}
+	echo version=${version}
 fi
 
 npm run lint
