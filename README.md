@@ -18,4 +18,4 @@ This is my project to:
 - Helm chart to deploy rust service, node service, and dependency charts.
 
 ## Diagram
-![Image](readme-images\hue-k8s.png)
+![Image](./readme-images/hue-k8s.png)
