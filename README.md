@@ -16,3 +16,6 @@ This is my project to:
 	- Service to update the TLS certificate from Let's Encrypt.
 - Traefik ingress to route traffic to rust service, node service, registry, etc.
 - Helm chart to deploy rust service, node service, and dependency charts.
+
+## Diagram
+![Image](readme-images\hue-k8s.png)
