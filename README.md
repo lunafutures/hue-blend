@@ -12,8 +12,8 @@ This is my project to:
 - Rust server to tell me what the color for a given time should be. (Color = color temperature + brightness)
 - Node service that will update the Hue bridge with the desired color periodically. Contains express service to allow changing colors for whole rooms with API calls from IoT devices.
 - Private registry to hold images of Rust server and Node service.
-	- Charts to update the IP address of the private registry. This ensures that docker doesn't complain about an insecure registry.
-	- Service to update the TLS certificate from Let's Encrypt.
+	- Charts to update the IP address of the private registry.
+	- Service to update the TLS certificate from Let's Encrypt. This ensures that docker doesn't complain about an insecure registry when doing `docker push`.
 - Traefik ingress to route traffic to rust service, node service, registry, etc.
 - Helm chart to deploy rust service, node service, and dependency charts.
 
